@@ -2,9 +2,9 @@ package downloader
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/cheggaaa/pb/v3"
-	"github.com/zzbkszd/godown/godown"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,19 +18,19 @@ import (
 // 注意该网站就他娘的可以用http爬取，服务端对于https的跨域支持有问题
 // 并发抓取会导致请求被拦截，所以目前只用单线程慢慢爬
 type OwllookDonwloader struct {
-	base     godown.AbstractDownloader
+	AbstractDownloader
 	chapters []string
 	names    []string
 }
 
-func (d *OwllookDonwloader) Download(urlstr, dist string) {
-	d.base.Init()
+func (d *OwllookDonwloader) Download(urlstr, dist string) error {
+	d.Init()
 	url, e := url.Parse(urlstr)
 	if e != nil {
 		panic(e)
 	}
 	request := &http.Request{Method: "Get", URL: url}
-	html := d.base.FetchText(request)
+	html := d.FetchText(request)
 	d.chapters, d.names = d.parseChapters(html)
 	chapterCount := len(d.chapters)
 	bar := pb.StartNew(chapterCount)
@@ -44,20 +44,16 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) {
 		bar.Increment()
 	}
 	bar.Finish()
-
+	return nil
 	//d.combinChpater(chapterCount, dist)
 
-	/*
-		https://www.owllook.net/chapter?url=http://www.mangg.com/id7769/&novels_name=%E8%AF%A1%E7%A7%98%E4%B9%8B%E4%B8%BB
-		https://www.owllook.net/owllook_content?url=http://www.mangg.com//id7769/4389310.html&name=%E7%AC%AC%E4%B8%80%E7%AB%A0%20%E7%BB%AF%E7%BA%A2&chapter_url=http://www.mangg.com/id7769/&novels_name=%E8%AF%A1%E7%A7%98%E4%B9%8B%E4%B8%BB
-	*/
 }
 
 // 用于多线程下载的预备方法
 func (d *OwllookDonwloader) downloadGo(idx int, dist string,
 	bar *pb.ProgressBar) {
 	distPath := path.Join(dist, strconv.Itoa(idx))
-	d.base.PrepareDist(distPath)
+	d.PrepareDist(distPath)
 	distFile, e := os.OpenFile(distPath, os.O_CREATE, 0777)
 	if e != nil {
 		panic(e)
@@ -68,7 +64,7 @@ func (d *OwllookDonwloader) downloadGo(idx int, dist string,
 
 func (d *OwllookDonwloader) downloadChapter(chapter, name string, distFile *os.File) {
 	chapter_url, e := url.Parse(chapter)
-	chapter_html := d.base.FetchText(&http.Request{Method: "Get", URL: chapter_url})
+	chapter_html := d.FetchText(&http.Request{Method: "Get", URL: chapter_url})
 	cd, e := goquery.NewDocumentFromReader(strings.NewReader(chapter_html))
 	if e != nil {
 		panic(e)
@@ -112,12 +108,13 @@ func (d *OwllookDonwloader) parseChapters(html string) ([]string, []string) {
 	list.Each(func(idx int, selection *goquery.Selection) {
 		href, _ := selection.Attr("href")
 		name := selection.Text()
-		chapter := "http://www.owllook.shadownet/owllook_content?url=" + content_url + href +
+		chapter := "http://www.owllook.net/owllook_content?url=" + content_url + href +
 			"&name=" + url.QueryEscape(name) + "&chapter_url=" + chapter_url +
 			"&novels_name=" + url.QueryEscape(novels_name)
 		chapters = append(chapters, chapter)
 		names = append(names, name)
 	})
+	fmt.Printf("chapters: %d, names: %d\n", len(chapters), len(names))
 	return chapters, names
 }
 

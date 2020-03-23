@@ -2,10 +2,8 @@ package downloader
 
 import (
 	"github.com/cheggaaa/pb/v3"
-	"github.com/zzbkszd/godown/godown"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -13,27 +11,24 @@ import (
 )
 
 type M3u8Downloader struct {
-	base    godown.AbstractDownloader
-	tsList  []string // todo 用数组模拟队列是一件性能很低下的操作
+	AbstractDownloader
+	tsList  []string // todo 用切片模拟队列是一件性能很低下的操作
 	tsLock  *sync.Mutex
 	Threads int
 }
 
-func (d *M3u8Downloader) Download(urlstr, dist string) {
-	d.base.Init()
+func (d *M3u8Downloader) Download(urlstr, dist string) error {
+	d.Init()
 	if d.Threads == 0 {
 		d.Threads = 5
 	}
 	tsdir := path.Join(path.Dir(dist), "ts")
-	d.base.PrepareDist(tsdir)
-	src, e := url.Parse(urlstr)
-	if e != nil {
-		panic(e)
-	}
-	m3u8File := d.base.FetchText(&http.Request{Method: http.MethodGet, URL: src})
+	d.PrepareDist(tsdir)
+	m3u8File := d.FetchText(quickRequest(http.MethodGet, urlstr, nil))
 	tsList := d.parseTsList(m3u8File)
 	d.doDownload(tsList, urlstr, tsdir)
 	d.combinTs(tsList, dist, tsdir)
+	return nil
 
 }
 
@@ -87,13 +82,9 @@ func (d *M3u8Downloader) downloadGo(baseUrl string, tsdir string,
 	bar *pb.ProgressBar, group *sync.WaitGroup) {
 	for len(d.tsList) > 0 {
 		tsName := d.popTs()
-		tsUrl, e := url.Parse(strings.Join([]string{baseUrl, tsName}, "/"))
-		if e != nil {
-			print(e)
-			d.pushTs(tsName)
-		}
+		tsUrl := strings.Join([]string{baseUrl, tsName}, "/")
 		tsDist := path.Join(tsdir, tsName)
-		d.base.HttpDown(&http.Request{Method: http.MethodGet, URL: tsUrl}, tsDist)
+		d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist)
 		bar.Increment()
 	}
 	group.Done()
