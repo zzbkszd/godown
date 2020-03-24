@@ -3,6 +3,7 @@ package downloader
 import (
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
+	"github.com/zzbkszd/godown/godown/shadownet"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 )
 
 type Downloader interface {
@@ -30,8 +32,14 @@ func (d *AbstractDownloader) Download(url string, dist string) error {
 // 初始化网络等信息
 func (d *AbstractDownloader) Init() {
 	if d.Client == nil {
-		d.Client = &http.Client{}
-		//d.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+		//d.Client = &http.Client{}
+		d.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+		//proxyUrl, _ := url.Parse("socks5://127.0.0.1:1080")
+		//d.Client = &http.Client{
+		//	Transport: &http.Transport{
+		//		Proxy: http.ProxyURL(proxyUrl),
+		//	},
+		//}
 	}
 }
 
@@ -52,7 +60,7 @@ func (d *AbstractDownloader) FetchSize(req *http.Request) int {
 	return cl
 }
 
-// 拉取html页面
+// 拉取文本内容
 func (d *AbstractDownloader) FetchText(req *http.Request) string {
 	resp, err := d.Client.Do(req)
 	defer resp.Body.Close()
@@ -73,7 +81,31 @@ func (d *AbstractDownloader) HttpDown(req *http.Request, dist string) {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	fmt.Println("response code:", resp.Status)
+	d.PrepareDist(dist)
+	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
+	if e != nil {
+		panic(e)
+	}
+	_, e = io.Copy(distFile, resp.Body)
+	if e != nil {
+		panic(e)
+	}
+}
+
+/**
+这个的实现就是为了能够调用HttpDown，避免抽象类的Download方法没有实现的问题
+*/
+type HttpDownloader struct {
+	AbstractDownloader
+}
+
+func (d *HttpDownloader) Download(urlstr string, dist string) error {
+	d.Init()
+	resp, err := d.Client.Do(quickRequest(http.MethodGet, urlstr, nil))
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 	d.PrepareDist(dist)
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
 	cl, e := strconv.Atoi(resp.Header.Get("Content-Length"))
@@ -82,26 +114,11 @@ func (d *AbstractDownloader) HttpDown(req *http.Request, dist string) {
 		panic(e)
 	}
 	pr := bar.NewProxyReader(resp.Body)
-
 	_, e = io.Copy(distFile, pr)
 	bar.Finish()
 	if e != nil {
 		panic(e)
 	}
-}
-
-type HttpDownloader struct {
-	AbstractDownloader
-}
-
-func (d *HttpDownloader) Download(urlstr string, dist string) error {
-	d.Init()
-	url, e := url.Parse(urlstr)
-	if e != nil {
-		panic(e)
-	}
-	request := http.Request{Method: "Get", URL: url}
-	d.HttpDown(&request, dist)
 	return nil
 }
 
@@ -115,13 +132,16 @@ func quickRequest(method string, urlStr string, headers http.Header) (req *http.
 		panic(e)
 	}
 	if headers == nil {
-		headers = http.Header{
-			"User-Agent": []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"},
-		}
+		headers = shadownet.DefaultHeader
 	} else {
 		headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36")
 	}
 	req = &http.Request{Method: http.MethodGet, URL: reqUrl, Header: headers}
 
 	return req
+}
+
+func getParentUrl(base string) string {
+	parent := strings.Split(base, "/")
+	return strings.Join(parent[:len(parent)-1], "/")
 }

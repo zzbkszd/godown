@@ -15,12 +15,13 @@ import (
 
 /**
 基于shadowsocks的接口实现一个可以直接与ss服务器通信的httpclient
-tested on : bilibili video downloader
+
+alpha版本
 
 */
-var debugMode bool = true   // debug输出开关
+var debugMode bool = false  // debug输出开关
 var directConn bool = false // 直连开关，开启则不使用shadowsocks加密,
-var defaultHandshakeMode int = HANDSHAKE_IP
+var defaultHandshakeMode int = HANDSHAKE_HOST
 var DefaultHeader http.Header = map[string][]string{
 	"User-Agent": []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"},
 }
@@ -40,35 +41,36 @@ type ShadowConfig struct {
 }
 
 var LocalShadowConfig *ShadowConfig = &ShadowConfig{
-	//Ip: "127.0.0.1",
 	Ip:           "149.28.25.5",
 	Port:         6668,
 	Password:     "password",
 	CryptoMethod: "aes-256-cfb",
 }
 
-type ShadowTransport struct {
-	transport *http.Transport
-}
-
 func GetShadowClient(config *ShadowConfig) *http.Client {
-	st := ShadowTransport{transport: &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
+	st := &http.Transport{
+		Proxy:                 nil,
 		DialContext:           config.shadowDialer,
-		ForceAttemptHTTP2:     true,
+		ForceAttemptHTTP2:     false,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-	}}
-	client := http.Client{Transport: &st}
+	}
+	client := http.Client{Transport: st}
 	return &client
 }
 
-func (st *ShadowTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return st.transport.RoundTrip(req)
-}
+// 不必要的一层封装，直接用shadowDialer替换标准Transport中的DialContext就可以了
+// 如果未来要实现连接池的话，还可以用
+//type ShadowTransport struct {
+//	transport *http.Transport
+//}
+//
+//func (st *ShadowTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+//	return st.transport.RoundTrip(req)
+//}
 
 /**
 shadowsocks加密的拨号器
@@ -87,7 +89,7 @@ func (config *ShadowConfig) shadowDialer(ctx context.Context, network, addr stri
 		return nil, e
 	}
 	return &ShadowWrapConn{conn: conn,
-		handshake:     directConn, // 若是开启了直连，就不需要进行握手，默认已经握手，否则需要在第一次进行握手
+		handshake:     directConn, // 若是开启了直连，就不需要进行握手，否则需要在第一次进行握手
 		httpAddr:      addr,
 		cryptor:       cipher,
 		handshakeMode: defaultHandshakeMode,
@@ -178,31 +180,35 @@ func (sc *ShadowWrapConn) initLocalBuf() {
 要先读到内存缓冲区，再从缓冲区读出解密的数据
 不然读取指定长度的数据会导致解密失败
 */
-func (sc *ShadowWrapConn) readToBuf() {
+func (sc *ShadowWrapConn) readToBuf() error {
 	if sc.localBuf == nil {
 		sc.initLocalBuf()
 	}
 	// 只在缓存区没有数据的时候去读取，否则当服务器写完之后会阻塞到超时
 	if sc.localBuf.Len() != 0 {
-		return
+		return nil
 	}
 	buf := make([]byte, 8192)
 	n, err := sc.conn.Read(buf)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	decrypt, _ := sc.cryptor.decrypt(buf[:n])
 	n, err = sc.localBuf.Write(decrypt)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 func (sc *ShadowWrapConn) Read(b []byte) (n int, err error) {
 	if directConn {
 		return sc.conn.Read(b)
 	}
 	sc.checkHandshake()
-	sc.readToBuf()
+	err = sc.readToBuf()
+	if err != nil {
+		return
+	}
 	n, err = sc.localBuf.Read(b)
 	//dp("read content\n", fmt.Sprintf("%s", b))
 	return

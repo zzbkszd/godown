@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"fmt"
 	"github.com/cheggaaa/pb/v3"
 	"io"
 	"net/http"
@@ -9,6 +10,11 @@ import (
 	"strings"
 	"sync"
 )
+
+/**
+m3u8 下载器
+暂不支持加密格式，未进行格式转换
+*/
 
 type M3u8Downloader struct {
 	AbstractDownloader
@@ -33,6 +39,7 @@ func (d *M3u8Downloader) Download(urlstr, dist string) error {
 }
 
 func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
+	fmt.Printf("[M3U8 Downloader] start combin ts data \n")
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
 	defer distFile.Close()
 	if e != nil {
@@ -94,7 +101,7 @@ func (d *M3u8Downloader) parseTsList(m3u8 string) []string {
 	baseList := strings.Split(m3u8, "\n")
 	distList := []string{}
 	for _, line := range baseList {
-		if len(line) == 0 || strings.Contains(line, "#") {
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			continue
 		} else {
 			distList = append(distList, line)

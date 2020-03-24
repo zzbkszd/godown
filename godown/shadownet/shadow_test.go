@@ -63,7 +63,7 @@ func TestProxy(t *testing.T) {
 	//go localSocketReader()
 	client := GetShadowClient(LocalShadowConfig)
 	//client := http.DefaultClient
-	u, _ := url.Parse("https://www.baidu.com")
+	u, _ := url.Parse("https://www.pornhub.com")
 	request := &http.Request{Method: http.MethodGet, URL: u, Header: DefaultHeader}
 	resp, err := client.Do(request)
 	if err != nil {
