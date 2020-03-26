@@ -16,7 +16,7 @@
 
 ## 目前支持：
 
-- bilibili av号视频下载
+- bilibili bv号视频下载
 - pornhub 视频下载
 - xvideos 视频下载
 - 基于owllook.net的小说下载

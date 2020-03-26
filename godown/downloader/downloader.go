@@ -45,16 +45,10 @@ func (d *AbstractDownloader) Download(url string, dist string) error {
 }
 
 // 初始化网络等信息
+// 默认使用http.DefaultClient，如需代理在外层指定，可以直接赋值Client
 func (d *AbstractDownloader) Init() {
 	if d.Client == nil {
-		d.Client = &http.Client{}
-		//d.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
-		//proxyUrl, _ := url.Parse("socks5://127.0.0.1:1080")
-		//d.Client = &http.Client{
-		//	Transport: &http.Transport{
-		//		Proxy: http.ProxyURL(proxyUrl),
-		//	},
-		//}
+		d.Client = http.DefaultClient
 	}
 }
 

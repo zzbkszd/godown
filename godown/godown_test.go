@@ -1,6 +1,7 @@
 package godown
 
 import (
+	"fmt"
 	"path"
 	"testing"
 )
@@ -26,4 +27,13 @@ func TestDownloadCollect(t *testing.T) {
 	}
 
 	ctx.DownloadCollect(collect)
+}
+
+func TestTwitterCollect(t *testing.T) {
+	collect, err := TwitterCollect("mengmiaoyizhi", "", 10)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("collect size:", collect.Size())
+	fmt.Println(collect.Source)
 }
