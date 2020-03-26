@@ -14,9 +14,8 @@ import (
 /**
 m3u8 下载器
 暂不支持加密格式，未进行格式转换
-*/
-/**
-todo： 失败任务的重试
+支持多线程并发下载，默认线程数为5
+已知设计BUG： 当因网络链接之类的问题导致下载确实无法进行时会无限次数重试。
 */
 type M3u8Downloader struct {
 	AbstractDownloader

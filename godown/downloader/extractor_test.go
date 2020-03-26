@@ -2,6 +2,8 @@ package downloader
 
 import (
 	"fmt"
+	"github.com/zzbkszd/godown/godown/shadownet"
+	"path"
 	"regexp"
 	"testing"
 )
@@ -55,4 +57,20 @@ func TestBilibili(t *testing.T) {
 
 func TestPornhub(t *testing.T) {
 	testExtractor("https://cn.pornhub.com/view_video.php?viewkey=ph5db26265db653", pornhubExtractor)
+}
+
+func TestTwitterDownloader(t *testing.T) {
+	td := TwitterDonwloader{}
+	td.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	//https://twitter.com/EfWMSxfSCrHY8v4/status/1242779629296840704 video
+	// https://twitter.com/isisdna123/status/1243084980516843521 picture
+	//https://twitter.com/i/web/status/1242779629296840704
+	td.Download("https://twitter.com/i/web/status/1242779629296840704",
+		path.Join("..", "data", "twitter"))
+	//	info, e := td.twitterExtractor("https://twitter.com/i/web/status/1242779629296840704")
+	//	if e != nil {
+	//		panic(e)
+	//	}
+	//	json, e := json.Marshal(info)
+	//	fmt.Println(string(json))
 }

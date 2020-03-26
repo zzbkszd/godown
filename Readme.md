@@ -2,12 +2,25 @@
 
 本项目功能说起来很简单，就是支持下载数据到本地
 
+特别鸣谢： [youtube-dl](https://github.com/ytdl-org/youtube-dl)
+
+项目，为本项目提供了大量网站解析的参考
+
+## 使用方法
+
+正在开发阶段，若需调用，请参考godown_test.go文件
+
+已开发完成的下载器可直接调用，需要科学上网的参考godown.shadownet包
+
+需要自行配置LocalShadowConfig，或者通过shadow_pool获取免费的服务器
+
 ## 目前支持：
 
 - bilibili av号视频下载
 - pornhub 视频下载
 - xvideos 视频下载
 - 基于owllook.net的小说下载
+- twitter 文本/图片/视频下载
 
 ## 基础设施：
 

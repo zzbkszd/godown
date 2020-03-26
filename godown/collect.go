@@ -6,6 +6,8 @@ import "github.com/zzbkszd/godown/godown/downloader"
 数据集和下载任务
 */
 var TYPE_VIDEO = 1
+var TYPE_NOVEL = 2
+var TYPE_TWITTER = 3
 
 type DownloadTask struct {
 	Dist       string

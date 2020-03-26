@@ -14,6 +14,12 @@ import (
 	"strings"
 )
 
+/**
+下载器
+下载器只用作下载单个数据
+数据列表的爬取工作是构造collect的工作。
+*/
+
 type ProgressInfo struct {
 	done  int
 	total int
