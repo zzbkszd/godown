@@ -1,6 +1,7 @@
 package shadownet
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -9,13 +10,14 @@ import (
 	"net/url"
 	"path"
 	"testing"
+	"time"
 )
 
 var testShadowConfig *ShadowConfig = &ShadowConfig{
-	Ip:           "127.0.0.1",
-	Port:         12300,
-	Password:     "password",
-	CryptoMethod: "aes-256-cfb",
+	Ip:           "45.82.255.115",
+	Port:         5922,
+	Password:     "lncn.org 5tb",
+	CryptoMethod: "rc4",
 }
 
 func localSocketReader() {
@@ -60,10 +62,11 @@ func TestSimpleHttpGet(t *testing.T) {
 }
 
 func TestProxy(t *testing.T) {
+
 	//go localSocketReader()
-	client := GetShadowClient(LocalShadowConfig)
+	client := GetShadowClient(testShadowConfig)
 	//client := http.DefaultClient
-	u, _ := url.Parse("https://www.pornhub.com")
+	u, _ := url.Parse("https://www.google.com")
 	request := &http.Request{Method: http.MethodGet, URL: u, Header: DefaultHeader}
 	resp, err := client.Do(request)
 	if err != nil {
@@ -88,4 +91,42 @@ func TestDecrypt(t *testing.T) {
 	dst := make([]byte, len(src))
 	cipher.XORKeyStream(dst, src)
 	fmt.Println(hex.EncodeToString(dst))
+}
+
+func TestECBDecrypt(t *testing.T) {
+	result := `[{"ssr":{"ip":"45.144.2.51","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 8ip","obfsparam":"","protoparam":null,"remarks":"莫斯科A","group":"Lncn.org","name":"莫斯科A"},"ssrUrl":"ssr://NDUuMTQ0LjIuNTE6NTkzMzpvcmlnaW46cmM0OnBsYWluOmJHNWpiaTV2Y21jZ09HbHcvP29iZnNwYXJhbT0mcmVtYXJrcz02STZyNXBhdjU2ZVJRUSZncm91cD1URzVqYmk1dmNtYw"},{"ssr":{"ip":"45.147.201.168","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 8ip","obfsparam":"","protoparam":null,"remarks":"莫斯科B","group":"Lncn.org","name":"莫斯科B"},"ssrUrl":"ssr://NDUuMTQ3LjIwMS4xNjg6NTkzMzpvcmlnaW46cmM0OnBsYWluOmJHNWpiaTV2Y21jZ09HbHcvP29iZnNwYXJhbT0mcmVtYXJrcz02STZyNXBhdjU2ZVJRZyZncm91cD1URzVqYmk1dmNtYw"},{"ssr":{"ip":"85.117.234.98","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 8ip","obfsparam":"","protoparam":null,"remarks":"莫斯科C","group":"Lncn.org","name":"莫斯科C"},"ssrUrl":"ssr://ODUuMTE3LjIzNC45ODo1OTMzOm9yaWdpbjpyYzQ6cGxhaW46Ykc1amJpNXZjbWNnT0dsdy8_b2Jmc3BhcmFtPSZyZW1hcmtzPTZJNnI1cGF2NTZlUlF3Jmdyb3VwPVRHNWpiaTV2Y21j"},{"ssr":{"ip":"45.144.2.186","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 8ip","obfsparam":"","protoparam":null,"remarks":"莫斯科D","group":"Lncn.org","name":"莫斯科D"},"ssrUrl":"ssr://NDUuMTQ0LjIuMTg2OjU5MzM6b3JpZ2luOnJjNDpwbGFpbjpiRzVqYmk1dmNtY2dPR2x3Lz9vYmZzcGFyYW09JnJlbWFya3M9Nkk2cjVwYXY1NmVSUkEmZ3JvdXA9VEc1amJpNXZjbWM"},{"ssr":{"ip":"45.147.200.237","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2rr","obfsparam":"","protoparam":null,"remarks":"莫斯科I","group":"Lncn.org","name":"莫斯科I"},"ssrUrl":"ssr://NDUuMTQ3LjIwMC4yMzc6NTkzMzpvcmlnaW46cmM0OnBsYWluOmJHNWpiaTV2Y21jZ01uSnkvP29iZnNwYXJhbT0mcmVtYXJrcz02STZyNXBhdjU2ZVJTUSZncm91cD1URzVqYmk1dmNtYw"},{"ssr":{"ip":"46.17.45.194","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2rr","obfsparam":"","protoparam":null,"remarks":"莫斯科J","group":"Lncn.org","name":"莫斯科J"},"ssrUrl":"ssr://NDYuMTcuNDUuMTk0OjU5MzM6b3JpZ2luOnJjNDpwbGFpbjpiRzVqYmk1dmNtY2dNbkp5Lz9vYmZzcGFyYW09JnJlbWFya3M9Nkk2cjVwYXY1NmVSU2cmZ3JvdXA9VEc1amJpNXZjbWM"},{"ssr":{"ip":"193.38.50.206","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2rr","obfsparam":"","protoparam":null,"remarks":"莫斯科K","group":"Lncn.org","name":"莫斯科K"},"ssrUrl":"ssr://MTkzLjM4LjUwLjIwNjo1OTMzOm9yaWdpbjpyYzQ6cGxhaW46Ykc1amJpNXZjbWNnTW5KeS8_b2Jmc3BhcmFtPSZyZW1hcmtzPTZJNnI1cGF2NTZlUlN3Jmdyb3VwPVRHNWpiaTV2Y21j"},{"ssr":{"ip":"45.136.244.204","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2rr","obfsparam":"","protoparam":null,"remarks":"莫斯科L","group":"Lncn.org","name":"莫斯科L"},"ssrUrl":"ssr://NDUuMTM2LjI0NC4yMDQ6NTkzMzpvcmlnaW46cmM0OnBsYWluOmJHNWpiaTV2Y21jZ01uSnkvP29iZnNwYXJhbT0mcmVtYXJrcz02STZyNXBhdjU2ZVJUQSZncm91cD1URzVqYmk1dmNtYw"},{"ssr":{"ip":"139.28.235.243","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2ji","obfsparam":"","protoparam":null,"remarks":"洛杉矶A","group":"Lncn.org","name":"洛杉矶A"},"ssrUrl":"ssr://MTM5LjI4LjIzNS4yNDM6NTkzMzpvcmlnaW46cmM0OnBsYWluOmJHNWpiaTV2Y21jZ01tcHAvP29iZnNwYXJhbT0mcmVtYXJrcz01clNiNXAySjU1LTJRUSZncm91cD1URzVqYmk1dmNtYw"},{"ssr":{"ip":"139.28.235.84","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2ji","obfsparam":"","protoparam":null,"remarks":"洛杉矶B","group":"Lncn.org","name":"洛杉矶B"},"ssrUrl":"ssr://MTM5LjI4LjIzNS44NDo1OTMzOm9yaWdpbjpyYzQ6cGxhaW46Ykc1amJpNXZjbWNnTW1wcC8_b2Jmc3BhcmFtPSZyZW1hcmtzPTVyU2I1cDJKNTUtMlFnJmdyb3VwPVRHNWpiaTV2Y21j"},{"ssr":{"ip":"45.82.255.115","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2ji","obfsparam":"","protoparam":null,"remarks":"洛杉矶C","group":"Lncn.org","name":"洛杉矶C"},"ssrUrl":"ssr://NDUuODIuMjU1LjExNTo1OTMzOm9yaWdpbjpyYzQ6cGxhaW46Ykc1amJpNXZjbWNnTW1wcC8_b2Jmc3BhcmFtPSZyZW1hcmtzPTVyU2I1cDJKNTUtMlF3Jmdyb3VwPVRHNWpiaTV2Y21j"},{"ssr":{"ip":"45.12.109.134","port":"5933","protocol":"origin","method":"rc4","obfs":"plain","password":"lncn.org 2ji","obfsparam":"","protoparam":null,"remarks":"洛杉矶D","group":"Lncn.org","name":"洛杉矶D"},"ssrUrl":"ssr://NDUuMTIuMTA5LjEzNDo1OTMzOm9yaWdpbjpyYzQ6cGxhaW46Ykc1amJpNXZjbWNnTW1wcC8_b2Jmc3BhcmFtPSZyZW1hcmtzPTVyU2I1cDJKNTUtMlJBJmdyb3VwPVRHNWpiaTV2Y21j"}]`
+	content := "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"
+	key := "cjU0ZzJ5NnMydTU2ZGxmZQ"
+	c64, _ := base64.RawStdEncoding.DecodeString(content)
+	k64, _ := base64.RawStdEncoding.DecodeString(key)
+	dec, e := aesEcbDecode(c64, k64)
+	if e != nil {
+		panic(e)
+	}
+	fmt.Println(dec)
+	if result != dec {
+		t.Fail()
+	}
+	//for idx := range []byte(result) {
+	//	if result[idx] != dec[idx] {
+	//		fmt.Printf("res: %s, dec: %s", string(result[idx:idx+10]), string(dec[idx:idx+10]))
+	//		break
+	//	}
+	//}
+}
+
+func TestPool(t *testing.T) {
+
+	info := ShadowProxyInfo{
+		config: &ShadowConfig{
+			Ip:           "45.82.255.115",
+			Port:         5922,
+			Password:     "lncn.org 5tb",
+			CryptoMethod: "rc4",
+		},
+		enable:   false,
+		lastTest: time.Time{},
+		delay:    0,
+	}
+	fetchSStool(GetShadowClient(info.config))
 }

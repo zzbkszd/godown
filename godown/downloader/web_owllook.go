@@ -30,7 +30,10 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 		panic(e)
 	}
 	request := &http.Request{Method: "Get", URL: url}
-	html := d.FetchText(request)
+	html, e := d.FetchText(request)
+	if e != nil {
+		return e
+	}
 	d.chapters, d.names = d.parseChapters(html)
 	chapterCount := len(d.chapters)
 	bar := pb.StartNew(chapterCount)
@@ -58,18 +61,27 @@ func (d *OwllookDonwloader) downloadGo(idx int, dist string,
 	if e != nil {
 		panic(e)
 	}
-	d.downloadChapter(d.chapters[idx], d.names[idx], distFile)
+	e = d.downloadChapter(d.chapters[idx], d.names[idx], distFile)
 	bar.Increment()
-}
-
-func (d *OwllookDonwloader) downloadChapter(chapter, name string, distFile *os.File) {
-	chapter_url, e := url.Parse(chapter)
-	chapter_html := d.FetchText(&http.Request{Method: "Get", URL: chapter_url})
-	cd, e := goquery.NewDocumentFromReader(strings.NewReader(chapter_html))
 	if e != nil {
 		panic(e)
 	}
+}
+
+func (d *OwllookDonwloader) downloadChapter(chapter, name string, distFile *os.File) error {
+	chapter_url, e := url.Parse(chapter)
+	chapter_html, e := d.FetchText(&http.Request{Method: "Get", URL: chapter_url})
+	if e != nil {
+		return e
+	}
+	cd, e := goquery.NewDocumentFromReader(strings.NewReader(chapter_html))
+	if e != nil {
+		return e
+	}
 	content, e := cd.Find("#content").First().Html()
+	if e != nil {
+		return e
+	}
 	content = strings.ReplaceAll(content, "<br/>", "\n")
 	if len(content) < 100 {
 		panic("content too short!" + chapter_html)
@@ -86,9 +98,7 @@ func (d *OwllookDonwloader) downloadChapter(chapter, name string, distFile *os.F
 
 	_, err = distFile.WriteString("\n" + name + "\n\n")
 	_, err = distFile.WriteString(formated_content)
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 
 func (d *OwllookDonwloader) parseChapters(html string) ([]string, []string) {

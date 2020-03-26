@@ -6,6 +6,11 @@ import (
 	"testing"
 )
 
+func TestUrlCutter(t *testing.T) {
+	name := GetUrlFileName("https://www.xvideos.com/video44476201/_")
+	fmt.Println(name)
+}
+
 func TestRegexp(t *testing.T) {
 	webpage :=
 		`html5player.setVideoTitle('Biker Takes his Girl');

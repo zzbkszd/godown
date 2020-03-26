@@ -15,12 +15,17 @@ import (
 m3u8 下载器
 暂不支持加密格式，未进行格式转换
 */
-
+/**
+todo： 失败任务的重试
+*/
 type M3u8Downloader struct {
 	AbstractDownloader
-	tsList  []string // todo 用切片模拟队列是一件性能很低下的操作
+	tsList  []string // todo 用切片模拟队列是一件性能很低下的操作，考虑使用缓冲管道来处理
 	tsLock  *sync.Mutex
 	Threads int
+}
+type tsTask struct {
+	baseUrl, distDir, tsUrl string
 }
 
 func (d *M3u8Downloader) Download(urlstr, dist string) error {
@@ -30,12 +35,14 @@ func (d *M3u8Downloader) Download(urlstr, dist string) error {
 	}
 	tsdir := path.Join(path.Dir(dist), "ts")
 	d.PrepareDist(tsdir)
-	m3u8File := d.FetchText(quickRequest(http.MethodGet, urlstr, nil))
+	m3u8File, err := d.FetchText(quickRequest(http.MethodGet, urlstr, nil))
+	if err != nil {
+		return err
+	}
 	tsList := d.parseTsList(m3u8File)
 	d.doDownload(tsList, urlstr, tsdir)
 	d.combinTs(tsList, dist, tsdir)
 	return nil
-
 }
 
 func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
@@ -46,14 +53,14 @@ func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
 		panic(e)
 	}
 	for _, name := range tsList {
-		tssrc := path.Join(tsdir, name)
-		tsFile, e := os.OpenFile(tssrc, os.O_RDONLY, 0777)
-		defer tsFile.Close()
+		tsPath := path.Join(tsdir, GetUrlFileName(name))
+		tsFile, e := os.OpenFile(tsPath, os.O_RDONLY, 0777)
 		if e != nil {
 			panic(e)
 		}
 		io.Copy(distFile, tsFile)
-		defer os.Remove(tssrc)
+		tsFile.Close()
+		os.Remove(tsPath)
 	}
 
 }
@@ -63,14 +70,24 @@ func (d *M3u8Downloader) doDownload(tsList []string, baseUrl, tsdir string) {
 	base := strings.Join(parent[:len(parent)-1], "/")
 	bar := pb.StartNew(len(tsList))
 	defer bar.Finish()
-	d.tsLock = &sync.Mutex{}
-	d.tsList = tsList
+	tsCh := make(chan *tsTask, d.Threads*2)
+	doneCh := make(chan int, d.Threads)
 	waitGroup := &sync.WaitGroup{}
 	for i := 0; i < d.Threads; i++ {
-		go d.downloadGo(base, tsdir, bar, waitGroup)
-		waitGroup.Add(1)
+		go d.downloadGoChan(bar, waitGroup, tsCh, doneCh)
+	}
+	waitGroup.Add(len(tsList))
+	for _, ts := range tsList {
+		tsCh <- &tsTask{
+			baseUrl: base,
+			distDir: tsdir,
+			tsUrl:   ts,
+		}
 	}
 	waitGroup.Wait()
+	for i := 0; i < d.Threads; i++ {
+		doneCh <- 1
+	}
 }
 func (d *M3u8Downloader) popTs() string {
 	d.tsLock.Lock()
@@ -85,13 +102,41 @@ func (d *M3u8Downloader) pushTs(ts string) {
 	d.tsLock.Unlock()
 }
 
+func (d *M3u8Downloader) downloadGoChan(bar *pb.ProgressBar, group *sync.WaitGroup,
+	tsCh chan *tsTask, doneCh chan int) {
+	for {
+		select {
+		case ts := <-tsCh:
+			tsUrl := strings.Join([]string{ts.baseUrl, ts.tsUrl}, "/")
+			tsDist := path.Join(ts.distDir, GetUrlFileName(ts.tsUrl))
+			if err := d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist); err != nil {
+				tsCh <- ts
+				fmt.Println("DEBUG: download fail! add to chan:", ts.tsUrl)
+			} else {
+				bar.Increment()
+				group.Done()
+			}
+
+		case <-doneCh:
+			fmt.Println("DEBUG: download go chan closed!")
+			break
+		}
+	}
+}
+
+/**
+已废弃： 使用chan来代替低性能的队列
+*/
 func (d *M3u8Downloader) downloadGo(baseUrl string, tsdir string,
 	bar *pb.ProgressBar, group *sync.WaitGroup) {
 	for len(d.tsList) > 0 {
 		tsName := d.popTs()
 		tsUrl := strings.Join([]string{baseUrl, tsName}, "/")
-		tsDist := path.Join(tsdir, tsName)
-		d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist)
+		tsDist := path.Join(tsdir, GetUrlFileName(tsName))
+		err := d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist)
+		if err != nil {
+			d.pushTs(tsName)
+		}
 		bar.Increment()
 	}
 	group.Done()

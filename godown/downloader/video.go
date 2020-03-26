@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
@@ -8,9 +9,17 @@ import (
 	"github.com/tidwall/gjson"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
+
+// ffmpeg 视频编码器
+var ffmpeg_codec = "h264_qsv" // 适用于intel核显的硬件加速
 
 /**
 视频下载器
@@ -18,6 +27,12 @@ import (
 go 版本的 youtube-dl 简单实现。
 解析代码参照 youtube-dl的 extract 源码
 */
+var extractMapper = map[string]func(url string, downloader *AbstractDownloader) (*VideoInfo, error){
+	"www.bilibili.com": bilibiliExtractor,
+	"www.xvideos.com":  xvideosExtractor,
+	"cn.pornhub.com":   pornhubExtractor,
+	"www.pornhub.com":  pornhubExtractor,
+}
 
 type VideoDonwloader struct {
 	AbstractDownloader
@@ -34,13 +49,29 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) error {
 	if extrator, ok := extractMapper[host]; ok {
 		// 只下载第一个，所以如果要做优选，则需要在解析器内进行排序
 		info, _ := extrator(urlStr, &vd.AbstractDownloader)
+		distExt := filepath.Ext(dist)
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
+		//fmt.Println("[Video Downloader] download video url: ", info.infos[0].url)
 		if info.infos[0].ext == "hls" {
 			m3u8d := M3u8Downloader{}
 			m3u8d.Client = vd.Client
-			m3u8d.Download(info.infos[0].url, dist)
+			if distExt != "ts" {
+				tempDist := path.Join(path.Dir(dist),
+					fmt.Sprintf("temp.%d.ts", int(time.Now().Unix())))
+				m3u8d.Download(info.infos[0].url, tempDist)
+				err := vd.videoTrans(tempDist, dist)
+				if err == nil {
+					os.Remove(tempDist)
+				} else {
+					return err
+				}
+			} else {
+				m3u8d.Download(info.infos[0].url, dist)
+			}
 		} else {
-			vd.HttpDown(quickRequest(http.MethodGet, info.infos[0].url, info.infos[0].headers), dist)
+			httpd := HttpDownloader{Header: info.infos[0].headers}
+			httpd.Client = vd.Client
+			httpd.Download(info.infos[0].url, dist)
 		}
 	} else {
 		return fmt.Errorf("Unsupport video source!")
@@ -48,11 +79,19 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) error {
 	return nil
 }
 
-var extractMapper = map[string]func(url string, downloader *AbstractDownloader) (*VideoInfo, error){
-	"www.bilibili.com": bilibiliExtractor,
-	"www.xvideos.com":  xvideosExtractor,
-	"cn.pornhub.com":   pornhubExtractor,
-	"www.pornhub.com":  pornhubExtractor,
+func (vd *VideoDonwloader) videoTrans(src string, dist string) error {
+	absSrc, _ := filepath.Abs(src)
+	absDist, _ := filepath.Abs(dist)
+	ctx := context.Background()
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-i", absSrc, "-c:v",
+		ffmpeg_codec, "-c:a", "aac", absDist)
+	cmd.Start()
+	//done := ctx.Done()
+	fmt.Println("[Video Downloader] video format decode start!")
+	err := cmd.Wait()
+	fmt.Println("[Video Downloader] video format decode done!")
+	return err
 }
 
 type ExtractInfo struct {
@@ -84,7 +123,10 @@ func bilibiliExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo
 	info = &VideoInfo{src: videoUrl}
 	id := videoUrl[strings.LastIndex(videoUrl, "/")+3:]
 	info.id = id
-	webpage := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	webpage, e := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	if e != nil {
+		return nil, e
+	}
 	// 获取CID
 	reg := regexp.MustCompile("\\bcid(?:[\"\\']:|=)(?P<cid>\\d+)")
 	// 0 是全文，1是cid
@@ -97,7 +139,10 @@ func bilibiliExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo
 		payload := fmt.Sprintf("appkey=%s&cid=%s&otype=json&%s", _APP_KEY, cid, rendition)
 		sign := fmt.Sprintf("%x", (md5.Sum([]byte(payload + _BILIBILI_KEY))))
 		apiCall := fmt.Sprintf("http://interface.bilibili.com/v2/playurl?%s&sign=%s", payload, sign)
-		respJsonStr := vd.FetchText(quickRequest(http.MethodGet, apiCall, nil))
+		respJsonStr, e := vd.FetchText(quickRequest(http.MethodGet, apiCall, nil))
+		if e != nil {
+			return nil, e
+		}
 		if respJsonStr == "" || len(respJsonStr) < 200 {
 			continue
 		}
@@ -124,7 +169,10 @@ xvideos support
 */
 func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo, e error) {
 	info = &VideoInfo{src: videoUrl}
-	webpage := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	webpage, e := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	if e != nil {
+		return nil, e
+	}
 	reg := regexp.MustCompile("setVideo([^(]+)\\([\"\\'](http.+?)[\"\\']")
 	allmatch := reg.FindAllStringSubmatch(webpage, 3)
 	eis := make([]ExtractInfo, 0)
@@ -141,7 +189,10 @@ func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 			ext = "mp4"
 			break
 		case "HLS": //  hls需要先下载hls列表，再下载hls文件
-			hlsPage := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))
+			hlsPage, e := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))
+			if e != nil {
+				continue
+			}
 			baseList := strings.Split(hlsPage, "\n")
 			// 可能有多个，这里只拿第一个
 			// warning: 默认第一个的清晰度是最高的，如果不是可能会有bug
@@ -167,6 +218,9 @@ func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 		})
 	}
 	info.infos = eis
+	if len(eis) != 0 { // 找到了就算了，别报错了
+		e = nil
+	}
 	return
 }
 
@@ -176,12 +230,16 @@ thanks for https://github.com/treant5612/pornhub-dl
 */
 func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo, e error) {
 	info = &VideoInfo{src: videoUrl}
-	getWebpage := func(plat string) string {
+	getWebpage := func(plat string) (r string, e error) {
 		header := http.Header{}
 		header.Set("Cookie", fmt.Sprintf("platform=%s;", plat))
-		return vd.FetchText(quickRequest(http.MethodGet, videoUrl, header))
+		r, e = vd.FetchText(quickRequest(http.MethodGet, videoUrl, header))
+		return
 	}
-	webpage := getWebpage("pc")
+	webpage, e := getWebpage("pc")
+	if e != nil {
+		return nil, e
+	}
 	document, _ := goquery.NewDocumentFromReader(strings.NewReader(webpage))
 	playerDiv := document.Find("#player")
 	if id, ok := playerDiv.Attr("data-video-id"); ok {

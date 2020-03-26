@@ -102,8 +102,11 @@ func newRC4MD5Stream(key, iv []byte, _ DecOrEnc) (cipher.Stream, error) {
 	h.Write(key)
 	h.Write(iv)
 	rc4key := h.Sum(nil)
-
 	return rc4.NewCipher(rc4key)
+}
+
+func newRC4Stream(key, iv []byte, _ DecOrEnc) (cipher.Stream, error) {
+	return rc4.NewCipher(key)
 }
 
 func newChaCha20Stream(key, iv []byte, _ DecOrEnc) (cipher.Stream, error) {
@@ -176,6 +179,7 @@ var cipherMethod = map[string]*cipherInfo{
 	"cast5-cfb":     {16, 8, newCast5Stream},
 	"rc4-md5":       {16, 16, newRC4MD5Stream},
 	"rc4-md5-6":     {16, 6, newRC4MD5Stream},
+	"rc4":           {16, 0, newRC4Stream},
 	"chacha20":      {32, 8, newChaCha20Stream},
 	"chacha20-ietf": {32, 12, newChaCha20IETFStream},
 	"salsa20":       {32, 8, newSalsa20Stream},
