@@ -19,7 +19,7 @@ import (
 alpha版本
 
 */
-var debugMode bool = true   // debug输出开关
+var debugMode bool = false  // debug输出开关
 var directConn bool = false // 直连开关，开启则不使用shadowsocks加密,
 var defaultHandshakeMode int = HANDSHAKE_HOST
 var DefaultHeader http.Header = map[string][]string{

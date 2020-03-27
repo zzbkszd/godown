@@ -2,7 +2,7 @@ package downloader
 
 import (
 	"fmt"
-	"github.com/zzbkszd/godown/godown"
+	"github.com/zzbkszd/godown/godown/common"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"io"
 	"io/ioutil"
@@ -20,8 +20,9 @@ import (
 数据列表的爬取工作是构造collect的工作。
 */
 type Downloader interface {
+	SetClient(client *http.Client)
 	Download(url string, dist string) error
-	godown.ProgressAble
+	common.ProgressAble
 }
 
 /**
@@ -32,7 +33,7 @@ type AbstractDownloader struct {
 	name   string
 	Client *http.Client
 	// 关于进度的成员变量：
-	godown.CommonProgress
+	common.CommonProgress
 }
 
 // Implement for interface Downloader
@@ -46,6 +47,10 @@ func (d *AbstractDownloader) Init() {
 	if d.Client == nil {
 		d.Client = http.DefaultClient
 	}
+}
+
+func (d *AbstractDownloader) SetClient(client *http.Client) {
+	d.Client = client
 }
 
 // 预先创建目录

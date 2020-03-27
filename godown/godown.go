@@ -2,11 +2,11 @@ package godown
 
 import (
 	"fmt"
+	"github.com/zzbkszd/godown/godown/common"
 	"github.com/zzbkszd/godown/godown/downloader"
-	"net/http"
+	"github.com/zzbkszd/godown/godown/shadownet"
 	"os"
 	"path"
-	"sync"
 )
 
 /**
@@ -21,102 +21,35 @@ type Godown struct {
 */
 func (god *Godown) DownloadCollect(collect *Collect) error {
 	collectBase := path.Join(god.DataPath, "collcet", collect.Name)
+	pg := &common.CommonProgress{
+		DisplayProgress: true,
+	}
 	os.MkdirAll(collectBase, 0777)
-	dt := downloadThread{}
-	putCh := dt.GetPutCh()
-	go dt.Run()
+	pg.InitProgress(int64(len(collect.Source)), false)
+	tasks := []func() error{}
+	client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
 	for idx, task := range collect.Source {
 		var downer downloader.Downloader
 		name := downloader.GetUrlFileName(task)
 		switch collect.Type {
 		case TYPE_VIDEO:
-			downer = &downloader.VideoDonwloader{
-				AbstractDownloader: downloader.AbstractDownloader{
-					//Client: shadownet.GetShadowClient(shadownet.LocalShadowConfig),
-					Client: http.DefaultClient,
-				},
-			}
+			downer = &downloader.VideoDonwloader{}
+			downer.SetClient(client)
 			name = fmt.Sprintf("%d.mp4", idx)
+		case TYPE_TWITTER:
+			downer = &downloader.TwitterDonwloader{}
+			downer.SetClient(client)
 		}
-
-		//fmt.Println("push download task dist name:", name)
-		putCh <- &DownloadTask{
-			Dist:       path.Join(collectBase, name),
-			Source:     task,
-			Type:       collect.Type,
-			Downloader: downer,
-		}
+		ltask := task
+		tasks = append(tasks, func() error {
+			err := downer.Download(ltask, path.Join(collectBase, name))
+			pg.UpdateProgress(1)
+			return err
+		})
 	}
-	dt.StopUntilDone()
-	return nil
-}
-
-type errTask struct {
-	task *DownloadTask
-	err  error
-}
-type downloadThread struct {
-	putCh   chan *DownloadTask
-	errCh   chan errTask
-	stopCh  chan int
-	stopMu  *sync.Mutex
-	curTask *DownloadTask
-}
-
-func (dt *downloadThread) GetStopCh() chan int {
-	if dt.stopCh == nil {
-		dt.stopCh = make(chan int)
+	cycle := common.MultiTaskCycle{
+		Threads:   5,
+		TryOnFail: false,
 	}
-	return dt.stopCh
-}
-func (dt *downloadThread) GetPutCh() chan *DownloadTask {
-	if dt.putCh == nil {
-		dt.putCh = make(chan *DownloadTask, 3) // 这是一个有缓冲的管道
-	}
-	return dt.putCh
-}
-func (dt *downloadThread) GetErrCh() chan errTask {
-	if dt.errCh == nil {
-		dt.errCh = make(chan errTask)
-	}
-	return dt.errCh
-}
-
-/**
-等待当前任务完成后再结束
-这是一个阻塞方法
-??? select 本身不会阻塞么？
-!!! select 会阻塞，但是外层的主程序不会啊。这个方法可以令主程序等待
-*/
-func (dt *downloadThread) StopUntilDone() {
-	dt.GetStopCh() <- 1
-	dt.stopMu.Lock()
-	dt.stopMu.Unlock()
-}
-
-/**
-下载循环
-*/
-func (dt *downloadThread) Run() {
-	if dt.putCh == nil {
-		dt.GetPutCh()
-	}
-	if dt.stopMu == nil {
-		dt.stopMu = &sync.Mutex{}
-	}
-	for {
-		select {
-		case <-dt.stopCh: // 优先关闭，即使任务管道中还有数据
-			break
-		case t := <-dt.putCh:
-			dt.stopMu.Lock() // 锁死，可以通过锁状态查看下载是否完成
-			dt.curTask = t
-			err := t.Downloader.Download(t.Source, t.Dist)
-			if dt.errCh != nil {
-				dt.errCh <- errTask{task: t, err: err}
-			}
-			dt.curTask = nil
-			dt.stopMu.Unlock()
-		}
-	}
+	return cycle.CostTasks(tasks)
 }

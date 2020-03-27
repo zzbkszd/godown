@@ -41,6 +41,7 @@ api环境主要维护一个guestToken， 所以有一个全局的就可以了
 var commonTwitterApi = &twitterApi{}
 
 func (td *TwitterDonwloader) Download(urlStr string, dist string) error {
+	td.api = &twitterApi{}
 	td.api.init(td.Client)
 	info, e := td.api.twitterExtractor(urlStr)
 	if e != nil {

@@ -1,4 +1,4 @@
-package godown
+package common
 
 import (
 	"github.com/cheggaaa/pb/v3"
@@ -40,6 +40,7 @@ func (d *CommonProgress) GetProgress() *ProgressInfo {
 }
 
 func (d *CommonProgress) InitProgress(total int64, isByte bool) {
+	d.progressMutex = &sync.Mutex{}
 	d.progressMutex.Lock()
 	d.progressInfo = &ProgressInfo{
 		done:   0,
@@ -48,6 +49,7 @@ func (d *CommonProgress) InitProgress(total int64, isByte bool) {
 	}
 	if d.DisplayProgress {
 		d.pbbar = pb.New64(total)
+		d.pbbar.Start()
 		if isByte {
 			d.pbbar.Set(pb.Bytes, true)
 		}
@@ -71,7 +73,9 @@ func (d *CommonProgress) CloseProgress() {
 	if d.DisplayProgress {
 		d.pbbar.Finish()
 	}
-	close(d.progressChan)
+	if d.progressChan != nil {
+		close(d.progressChan)
+	}
 }
 
 /**

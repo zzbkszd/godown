@@ -95,13 +95,11 @@ func (d *M3u8Downloader) downloadGoChan(group *sync.WaitGroup, tsCh chan *tsTask
 			tsDist := path.Join(ts.distDir, GetUrlFileName(ts.tsUrl))
 			if err := d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist); err != nil {
 				tsCh <- ts
-				fmt.Println("DEBUG: download fail! add to chan:", ts.tsUrl)
 			} else {
 				d.UpdateProgress(1)
 				group.Done()
 			}
 		case <-doneCh:
-			fmt.Println("DEBUG: download go chan closed!")
 			break
 		}
 	}
