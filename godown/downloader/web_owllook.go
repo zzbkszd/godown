@@ -36,7 +36,7 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 	}
 	d.chapters, d.names = d.parseChapters(html)
 	chapterCount := len(d.chapters)
-	d.initProgress(int64(chapterCount), false)
+	d.InitProgress(int64(chapterCount), false)
 	distFile, err := os.OpenFile(dist, os.O_CREATE, 0777)
 	if err != nil {
 		panic(err)
@@ -44,9 +44,9 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 	for idx, _ := range d.chapters {
 		//d.downloadGo(idx, path.Join(path.Dir(dist), "chapter"), bar)
 		d.downloadChapter(d.chapters[idx], d.names[idx], distFile)
-		d.updateProgress(1)
+		d.UpdateProgress(1)
 	}
-	d.closeProgress()
+	d.CloseProgress()
 	return nil
 }
 

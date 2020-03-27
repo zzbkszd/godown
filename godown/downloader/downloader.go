@@ -2,7 +2,7 @@ package downloader
 
 import (
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
+	"github.com/zzbkszd/godown/godown"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"io"
 	"io/ioutil"
@@ -12,7 +12,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 /**
@@ -20,79 +19,25 @@ import (
 下载器只用作下载单个数据
 数据列表的爬取工作是构造collect的工作。
 */
-
-type ProgressInfo struct {
-	done   int64
-	total  int64
-	isByte bool
-}
-
 type Downloader interface {
 	Download(url string, dist string) error
-	ProgressChan() chan *ProgressInfo
-	GetProgress() *ProgressInfo
+	godown.ProgressAble
 }
 
-// 下载器的抽象接口
+/**
+下载器的抽象接口， 实现了Downloader接口，但是没有实现Download方法
+该接口主要是实现了统一的进度管理功能，避免了进度条的显示混乱
+*/
 type AbstractDownloader struct {
 	name   string
 	Client *http.Client
 	// 关于进度的成员变量：
-	DisplayProgress bool               // 是否在终端打印进度信息（pb)
-	progressChan    chan *ProgressInfo // 进度回调
-	progressInfo    *ProgressInfo      // 当前的进度信息
-	progressMutex   *sync.Mutex
-	pbbar           *pb.ProgressBar
+	godown.CommonProgress
 }
 
 // Implement for interface Downloader
 func (d *AbstractDownloader) Download(url string, dist string) error {
 	return fmt.Errorf("Not Implement Function")
-}
-
-func (d *AbstractDownloader) ProgressChan() chan *ProgressInfo {
-	d.progressMutex.Lock()
-	if d.progressChan != nil {
-		d.progressChan = make(chan *ProgressInfo)
-	}
-	d.progressMutex.Unlock()
-	return d.progressChan
-}
-
-func (d *AbstractDownloader) GetProgress() *ProgressInfo {
-	return d.progressInfo
-}
-
-func (d *AbstractDownloader) initProgress(total int64, isByte bool) {
-	d.progressMutex.Lock()
-	d.progressInfo = &ProgressInfo{
-		done:   0,
-		total:  total,
-		isByte: isByte,
-	}
-	if d.DisplayProgress {
-		d.pbbar = pb.New64(total)
-		if isByte {
-			d.pbbar.Set(pb.Bytes, true)
-		}
-	}
-	d.progressMutex.Unlock()
-}
-
-func (d *AbstractDownloader) updateProgress(p int64) {
-	d.progressMutex.Lock()
-	d.progressInfo.done += p
-	if d.DisplayProgress {
-		d.pbbar.Add64(p)
-	}
-	d.progressMutex.Unlock()
-}
-
-func (d *AbstractDownloader) closeProgress() {
-	if d.DisplayProgress {
-		d.pbbar.Finish()
-	}
-	close(d.progressChan)
 }
 
 // 初始化网络等信息
@@ -172,7 +117,7 @@ type ProgressReader struct {
 // Read reads bytes from wrapped reader and add amount of bytes to progress bar
 func (r *ProgressReader) Read(p []byte) (n int, err error) {
 	n, err = r.Reader.Read(p)
-	r.downloader.updateProgress(int64(n))
+	r.downloader.UpdateProgress(int64(n))
 	return
 }
 
@@ -194,8 +139,8 @@ func (d *HttpDownloader) Download(urlstr string, dist string) error {
 	d.PrepareDist(dist)
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
 	cl, e := strconv.Atoi(resp.Header.Get("Content-Length"))
-	d.initProgress(int64(cl), true)
-	defer d.closeProgress()
+	d.InitProgress(int64(cl), true)
+	defer d.CloseProgress()
 	if e != nil {
 		return (e)
 	}
