@@ -36,7 +36,7 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 	}
 	d.chapters, d.names = d.parseChapters(html)
 	chapterCount := len(d.chapters)
-	bar := pb.StartNew(chapterCount)
+	d.initProgress(int64(chapterCount), false)
 	distFile, err := os.OpenFile(dist, os.O_CREATE, 0777)
 	if err != nil {
 		panic(err)
@@ -44,12 +44,10 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 	for idx, _ := range d.chapters {
 		//d.downloadGo(idx, path.Join(path.Dir(dist), "chapter"), bar)
 		d.downloadChapter(d.chapters[idx], d.names[idx], distFile)
-		bar.Increment()
+		d.updateProgress(1)
 	}
-	bar.Finish()
+	d.closeProgress()
 	return nil
-	//d.combinChpater(chapterCount, dist)
-
 }
 
 // 用于多线程下载的预备方法

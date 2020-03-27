@@ -67,13 +67,13 @@ func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
 func (d *M3u8Downloader) doDownload(tsList []string, baseUrl, tsdir string) {
 	parent := strings.Split(baseUrl, "/")
 	base := strings.Join(parent[:len(parent)-1], "/")
-	bar := pb.StartNew(len(tsList))
-	defer bar.Finish()
+	d.initProgress(int64(len(tsList)), false)
+	defer d.closeProgress()
 	tsCh := make(chan *tsTask, d.Threads*2)
 	doneCh := make(chan int, d.Threads)
 	waitGroup := &sync.WaitGroup{}
 	for i := 0; i < d.Threads; i++ {
-		go d.downloadGoChan(bar, waitGroup, tsCh, doneCh)
+		go d.downloadGoChan(waitGroup, tsCh, doneCh)
 	}
 	waitGroup.Add(len(tsList))
 	for _, ts := range tsList {
@@ -101,8 +101,7 @@ func (d *M3u8Downloader) pushTs(ts string) {
 	d.tsLock.Unlock()
 }
 
-func (d *M3u8Downloader) downloadGoChan(bar *pb.ProgressBar, group *sync.WaitGroup,
-	tsCh chan *tsTask, doneCh chan int) {
+func (d *M3u8Downloader) downloadGoChan(group *sync.WaitGroup, tsCh chan *tsTask, doneCh chan int) {
 	for {
 		select {
 		case ts := <-tsCh:
@@ -112,10 +111,9 @@ func (d *M3u8Downloader) downloadGoChan(bar *pb.ProgressBar, group *sync.WaitGro
 				tsCh <- ts
 				fmt.Println("DEBUG: download fail! add to chan:", ts.tsUrl)
 			} else {
-				bar.Increment()
+				d.updateProgress(1)
 				group.Done()
 			}
-
 		case <-doneCh:
 			fmt.Println("DEBUG: download go chan closed!")
 			break

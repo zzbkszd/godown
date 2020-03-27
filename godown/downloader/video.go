@@ -51,7 +51,6 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) error {
 		info, _ := extrator(urlStr, &vd.AbstractDownloader)
 		distExt := filepath.Ext(dist)
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
-		//fmt.Println("[Video Downloader] download video url: ", info.infos[0].url)
 		if info.infos[0].ext == "hls" {
 			m3u8d := M3u8Downloader{}
 			m3u8d.Client = vd.Client

@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 /**
@@ -21,27 +22,77 @@ import (
 */
 
 type ProgressInfo struct {
-	done  int
-	total int
-	unit  string
+	done   int64
+	total  int64
+	isByte bool
 }
 
 type Downloader interface {
 	Download(url string, dist string) error
-	//Progress() chan *ProgressInfo
-	//GetProgress() *ProgressInfo
-
+	ProgressChan() chan *ProgressInfo
+	GetProgress() *ProgressInfo
 }
 
 // 下载器的抽象接口
 type AbstractDownloader struct {
 	name   string
 	Client *http.Client
+	// 关于进度的成员变量：
+	DisplayProgress bool               // 是否在终端打印进度信息（pb)
+	progressChan    chan *ProgressInfo // 进度回调
+	progressInfo    *ProgressInfo      // 当前的进度信息
+	progressMutex   *sync.Mutex
+	pbbar           *pb.ProgressBar
 }
 
 // Implement for interface Downloader
 func (d *AbstractDownloader) Download(url string, dist string) error {
 	return fmt.Errorf("Not Implement Function")
+}
+
+func (d *AbstractDownloader) ProgressChan() chan *ProgressInfo {
+	d.progressMutex.Lock()
+	if d.progressChan != nil {
+		d.progressChan = make(chan *ProgressInfo)
+	}
+	d.progressMutex.Unlock()
+	return d.progressChan
+}
+
+func (d *AbstractDownloader) GetProgress() *ProgressInfo {
+	return d.progressInfo
+}
+
+func (d *AbstractDownloader) initProgress(total int64, isByte bool) {
+	d.progressMutex.Lock()
+	d.progressInfo = &ProgressInfo{
+		done:   0,
+		total:  total,
+		isByte: isByte,
+	}
+	if d.DisplayProgress {
+		d.pbbar = pb.New64(total)
+		if isByte {
+			d.pbbar.Set(pb.Bytes, true)
+		}
+	}
+	d.progressMutex.Unlock()
+}
+
+func (d *AbstractDownloader) updateProgress(p int64) {
+	d.progressMutex.Lock()
+	d.progressInfo.done += p
+	if d.DisplayProgress {
+		d.pbbar.Add64(p)
+	}
+	d.progressMutex.Unlock()
+}
+
+func (d *AbstractDownloader) closeProgress() {
+	if d.DisplayProgress {
+		d.pbbar.Finish()
+	}
+	close(d.progressChan)
 }
 
 // 初始化网络等信息
@@ -113,6 +164,26 @@ type HttpDownloader struct {
 	Header http.Header
 }
 
+type ProgressReader struct {
+	io.Reader
+	downloader *AbstractDownloader
+}
+
+// Read reads bytes from wrapped reader and add amount of bytes to progress bar
+func (r *ProgressReader) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
+	r.downloader.updateProgress(int64(n))
+	return
+}
+
+// Close the wrapped reader when it implements io.Closer
+func (r *ProgressReader) Close() (err error) {
+	if closer, ok := r.Reader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return
+}
+
 func (d *HttpDownloader) Download(urlstr string, dist string) error {
 	d.Init()
 	resp, err := d.Client.Do(quickRequest(http.MethodGet, urlstr, d.Header))
@@ -123,13 +194,13 @@ func (d *HttpDownloader) Download(urlstr string, dist string) error {
 	d.PrepareDist(dist)
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
 	cl, e := strconv.Atoi(resp.Header.Get("Content-Length"))
-	bar := pb.Full.Start64(int64(cl))
+	d.initProgress(int64(cl), true)
+	defer d.closeProgress()
 	if e != nil {
 		return (e)
 	}
-	pr := bar.NewProxyReader(resp.Body)
+	pr := &ProgressReader{resp.Body, &d.AbstractDownloader}
 	_, e = io.Copy(distFile, pr)
-	bar.Finish()
 	if e != nil {
 		return (e)
 	}

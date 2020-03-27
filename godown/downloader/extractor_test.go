@@ -67,10 +67,4 @@ func TestTwitterDownloader(t *testing.T) {
 	//https://twitter.com/i/web/status/1242779629296840704
 	td.Download("https://twitter.com/i/web/status/1242779629296840704",
 		path.Join("..", "data", "twitter"))
-	//	info, e := td.twitterExtractor("https://twitter.com/i/web/status/1242779629296840704")
-	//	if e != nil {
-	//		panic(e)
-	//	}
-	//	json, e := json.Marshal(info)
-	//	fmt.Println(string(json))
 }
