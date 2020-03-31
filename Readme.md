@@ -4,7 +4,7 @@
 
 特别鸣谢： [youtube-dl](https://github.com/ytdl-org/youtube-dl)
 
-项目，为本项目提供了大量网站解析的参考
+项目，为本项目提供了部分网站解析的参考
 
 ## 使用方法
 
@@ -19,8 +19,9 @@
 - bilibili bv号视频下载
 - pornhub 视频下载
 - xvideos 视频下载
-- 基于owllook.net的小说下载
+- owllook.net的小说下载
 - twitter 文本/图片/视频下载
+- e-hentai图片集下载
 
 ## 基础设施：
 
@@ -28,7 +29,7 @@
 - 国内直连的shadowsocks免费服务器爬取
 - m3u8视频下载器
 
-## feature
+## Todo list
 
 - 尽量避免panic，提升系统可用性
 - 提供基于web的控制台

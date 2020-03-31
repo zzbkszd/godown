@@ -13,7 +13,9 @@ import (
 Godown的后端上下文
 */
 type Godown struct {
-	DataPath string // 数据保存位置
+	DataPath           string // 数据保存位置
+	WorkThreads        int    // 工作线程数量
+	DefaultVideoFormat string
 }
 
 /**
@@ -22,7 +24,8 @@ type Godown struct {
 func (god *Godown) DownloadCollect(collect *Collect) error {
 	collectBase := path.Join(god.DataPath, "collcet", collect.Name)
 	pg := &common.CommonProgress{
-		DisplayProgress: true,
+		DisplayProgress: false,
+		DisplayOnUpdate: true,
 	}
 	os.MkdirAll(collectBase, 0777)
 	pg.InitProgress(int64(len(collect.Source)), false)
@@ -33,23 +36,33 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 		name := downloader.GetUrlFileName(task)
 		switch collect.Type {
 		case TYPE_VIDEO:
-			downer = &downloader.VideoDonwloader{}
-			downer.SetClient(client)
-			name = fmt.Sprintf("%d.mp4", idx)
+			downer = &downloader.VideoDonwloader{
+				AutoName: true,
+				AbstractDownloader: downloader.AbstractDownloader{
+					Client: client,
+					CommonProgress: common.CommonProgress{
+						DisplayProgress: true,
+					},
+				},
+			}
+			name = fmt.Sprintf("%d.%s", idx, god.DefaultVideoFormat)
 		case TYPE_TWITTER:
 			downer = &downloader.TwitterDonwloader{}
 			downer.SetClient(client)
 		}
 		ltask := task
 		tasks = append(tasks, func() error {
-			err := downer.Download(ltask, path.Join(collectBase, name))
+			_, err := downer.Download(ltask, path.Join(collectBase, name))
 			pg.UpdateProgress(1)
 			return err
 		})
 	}
+	if god.WorkThreads == 0 {
+		god.WorkThreads = 5
+	}
 	cycle := common.MultiTaskCycle{
-		Threads:   5,
-		TryOnFail: false,
+		Threads:   god.WorkThreads,
+		TryOnFail: true,
 	}
 	return cycle.CostTasks(tasks)
 }

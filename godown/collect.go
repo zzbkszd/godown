@@ -44,7 +44,7 @@ func (c *Collect) Size() interface{} {
 文件中每行为一个URL，集合名称为文件名，描述为空
 type 需要用户指定， 一个集合中只能包含一个类型
 */
-func ListFileCollect(file string, ctype int) (*Collect, error) {
+func ListFileCollect(file string, ctype, skip int) (*Collect, error) {
 	listFile, err := os.OpenFile(file, os.O_RDONLY, 0777)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func ListFileCollect(file string, ctype int) (*Collect, error) {
 		Type:        ctype,
 		Description: "",
 		Cover:       "",
-		Source:      source,
+		Source:      source[skip:],
 	}, nil
 
 }

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"github.com/cheggaaa/pb/v3"
 	"sync"
 )
@@ -20,10 +21,15 @@ type ProgressAble interface {
 */
 type CommonProgress struct {
 	DisplayProgress bool               // 是否在终端打印进度信息（pb)
+	DisplayOnUpdate bool               // 是否在更新时打印进度比例（字符）
 	progressChan    chan *ProgressInfo // 进度回调
 	progressInfo    *ProgressInfo      // 当前的进度信息
 	progressMutex   *sync.Mutex        // 更新进度信息的互斥锁
 	pbbar           *pb.ProgressBar    // 终端显示的进度条
+}
+
+func (d *CommonProgress) SetDisplay(isSet bool) {
+	d.DisplayProgress = isSet
 }
 
 func (d *CommonProgress) ProgressChan() chan *ProgressInfo {
@@ -63,6 +69,9 @@ func (d *CommonProgress) UpdateProgress(p int64) {
 	if d.DisplayProgress {
 		d.pbbar.Add64(p)
 	}
+	if d.DisplayOnUpdate {
+		fmt.Printf("\n current progress: %d/%d\n", d.progressInfo.done, d.progressInfo.total)
+	}
 	if d.progressChan != nil {
 		d.progressChan <- d.progressInfo
 	}
@@ -81,6 +90,12 @@ func (d *CommonProgress) CloseProgress() {
 /**
 多线程任务循环
 */
+type TaskSet []func() error
+
+func (set TaskSet) Add(task func() error) []func() error {
+	return append(set, task)
+}
+
 type MultiTaskCycle struct {
 	taskCh  chan func() error
 	doneCh  chan int

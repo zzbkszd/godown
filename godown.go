@@ -6,22 +6,14 @@ import (
 )
 
 func main() {
-	//shadownet.GetShadowPool()
-	//collect := &godown.Collect{
-	//	Name:        "bilibili",
-	//	Type:        godown.TYPE_VIDEO,
-	//	Description: "Collect for test bv",
-	//	Cover:       "",
-	//	Source: []string{
-	//		"https://www.bilibili.com/video/BV1F741117vi",
-	//	},
-	//}
-	collect, err := godown.TwitterCollect("mengmiaoyizhi", "", 10)
+	collect, err := godown.ListFileCollect("data/日产.dat", godown.TYPE_VIDEO, 16)
 	if err != nil {
 		panic(err)
 	}
 	ctx := godown.Godown{
-		DataPath: path.Join("..", "data"),
+		DataPath:           path.Join("..", "data"),
+		WorkThreads:        1,
+		DefaultVideoFormat: "ts",
 	}
 
 	ctx.DownloadCollect(collect)

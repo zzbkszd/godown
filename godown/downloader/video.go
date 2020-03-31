@@ -7,6 +7,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/robertkrimen/otto"
 	"github.com/tidwall/gjson"
+	"github.com/zzbkszd/godown/godown/common"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,9 +39,11 @@ type VideoDonwloader struct {
 	AbstractDownloader
 	sourceUrl string // 来源网站
 	extract   func(url string, vd *AbstractDownloader) (*VideoInfo, error)
+	AutoName  bool // 是否从目标网站自动读取文件名，若是则不使用指定文件名
+	// 但是无论如何dist中都要指定一个默认文件名
 }
 
-func (vd *VideoDonwloader) Download(urlStr string, dist string) error {
+func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string, err error) {
 	vd.Init()
 	vd.sourceUrl = urlStr
 	parsedUrl, _ := url.Parse(urlStr)
@@ -48,34 +51,54 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) error {
 
 	if extrator, ok := extractMapper[host]; ok {
 		// 只下载第一个，所以如果要做优选，则需要在解析器内进行排序
-		info, _ := extrator(urlStr, &vd.AbstractDownloader)
+		info, err := extrator(urlStr, &vd.AbstractDownloader)
+		if err != nil {
+			return "", nil
+		}
 		distExt := filepath.Ext(dist)
+		distPath := dist
+		if info.name != "" {
+			videoName := FormatFilename(info.name) + "." + distExt
+			distPath = path.Join(filepath.Dir(dist), videoName)
+		}
+		realDist = distPath
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
+		fmt.Println("[Video Downloader] download video src: ", info.infos[0].url)
+		fmt.Println("[Video Downloader] download video dist ext: ", distExt)
 		if info.infos[0].ext == "hls" {
-			m3u8d := M3u8Downloader{}
+			m3u8d := M3u8Downloader{
+				Threads: 5,
+				AbstractDownloader: AbstractDownloader{
+					Client: vd.Client,
+					CommonProgress: common.CommonProgress{
+						DisplayProgress: vd.DisplayProgress,
+					},
+				},
+			}
 			m3u8d.Client = vd.Client
-			if distExt != "ts" {
-				tempDist := path.Join(path.Dir(dist),
+			if distExt != ".ts" {
+				tempDist := path.Join(path.Dir(distPath),
 					fmt.Sprintf("temp.%d.ts", int(time.Now().Unix())))
 				m3u8d.Download(info.infos[0].url, tempDist)
-				err := vd.videoTrans(tempDist, dist)
+				err := vd.videoTrans(tempDist, distPath)
 				if err == nil {
 					os.Remove(tempDist)
 				} else {
-					return err
+					return "", nil
 				}
 			} else {
-				m3u8d.Download(info.infos[0].url, dist)
+				m3u8d.Download(info.infos[0].url, distPath)
 			}
 		} else {
 			httpd := HttpDownloader{Header: info.infos[0].headers}
 			httpd.Client = vd.Client
-			httpd.Download(info.infos[0].url, dist)
+			httpd.Download(info.infos[0].url, distPath)
 		}
 	} else {
-		return fmt.Errorf("Unsupport video source!")
+		err = fmt.Errorf("Unsupport video source!")
+		return
 	}
-	return nil
+	return
 }
 
 func (vd *VideoDonwloader) videoTrans(src string, dist string) error {
@@ -240,6 +263,9 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 		return nil, e
 	}
 	document, _ := goquery.NewDocumentFromReader(strings.NewReader(webpage))
+	if title, ok := document.Find("[property='og:title']").Attr("content"); ok {
+		info.name = title
+	}
 	playerDiv := document.Find("#player")
 	if id, ok := playerDiv.Attr("data-video-id"); ok {
 		info.id = id
@@ -267,7 +293,27 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 			continue
 		}
 		ext := v["format"].(string)
+		if ext == "mp4" { // 只下载m3u8
+			continue
+		}
 		vurl := v["videoUrl"].(string)
+		if ext == "hls" {
+			master, err := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))
+			if err != nil {
+				return nil, err
+			}
+			baseList := strings.Split(master, "\n")
+			// 可能有多个，这里只拿第一个
+			for _, line := range baseList {
+				if len(line) == 0 || strings.HasPrefix(line, "#") {
+					continue
+				} else {
+					vurl = getParentUrl(vurl) + "/" + line
+					ext = "hls"
+					break
+				}
+			}
+		}
 		eis = append(eis, ExtractInfo{
 			url:     vurl,
 			ext:     ext,
@@ -277,4 +323,12 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 	}
 	info.infos = eis
 	return
+}
+
+func getMeta(doc goquery.Document, selector, attrName string) string {
+	if attr, ok := doc.Find("[property='og:title']").Attr("content"); ok {
+		return attr
+	} else {
+		return ""
+	}
 }

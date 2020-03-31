@@ -40,12 +40,12 @@ api环境主要维护一个guestToken， 所以有一个全局的就可以了
 */
 var commonTwitterApi = &twitterApi{}
 
-func (td *TwitterDonwloader) Download(urlStr string, dist string) error {
+func (td *TwitterDonwloader) Download(urlStr string, dist string) (string, error) {
 	td.api = &twitterApi{}
 	td.api.init(td.Client)
 	info, e := td.api.twitterExtractor(urlStr)
 	if e != nil {
-		return e
+		return "", e
 	}
 	for idx, u := range info.Picture {
 		mname := info.Id + "." + GetUrlFileName(u)
@@ -72,9 +72,10 @@ func (td *TwitterDonwloader) Download(urlStr string, dist string) error {
 	infoDist := path.Join(dist, fmt.Sprintf("%s.json", info.Id))
 	infoJson, e := json.Marshal(info)
 	if e != nil {
-		return e
+		return "", e
 	}
-	return ioutil.WriteFile(infoDist, infoJson, 0777)
+	e = ioutil.WriteFile(infoDist, infoJson, 0777)
+	return infoDist, e
 }
 
 type twitterApi struct {

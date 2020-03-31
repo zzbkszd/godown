@@ -23,7 +23,7 @@ type OwllookDonwloader struct {
 	names    []string
 }
 
-func (d *OwllookDonwloader) Download(urlstr, dist string) error {
+func (d *OwllookDonwloader) Download(urlstr, dist string) (string, error) {
 	d.Init()
 	url, e := url.Parse(urlstr)
 	if e != nil {
@@ -32,14 +32,14 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 	request := &http.Request{Method: "Get", URL: url}
 	html, e := d.FetchText(request)
 	if e != nil {
-		return e
+		return "", e
 	}
 	d.chapters, d.names = d.parseChapters(html)
 	chapterCount := len(d.chapters)
 	d.InitProgress(int64(chapterCount), false)
 	distFile, err := os.OpenFile(dist, os.O_CREATE, 0777)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	for idx, _ := range d.chapters {
 		//d.downloadGo(idx, path.Join(path.Dir(dist), "chapter"), bar)
@@ -47,7 +47,7 @@ func (d *OwllookDonwloader) Download(urlstr, dist string) error {
 		d.UpdateProgress(1)
 	}
 	d.CloseProgress()
-	return nil
+	return dist, nil
 }
 
 // 用于多线程下载的预备方法
