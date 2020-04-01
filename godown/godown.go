@@ -22,7 +22,8 @@ type Godown struct {
 下载一个集合
 */
 func (god *Godown) DownloadCollect(collect *Collect) error {
-	collectBase := path.Join(god.DataPath, "collcet", collect.Name)
+	fmt.Println("[GoDown] initial collect downloader")
+	collectBase := path.Join(god.DataPath, "collect", collect.Name)
 	pg := &common.CommonProgress{
 		DisplayProgress: false,
 		DisplayOnUpdate: true,
@@ -60,6 +61,7 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 	if god.WorkThreads == 0 {
 		god.WorkThreads = 5
 	}
+	fmt.Printf("[GoDown] downloader initialed, %d tasks and %d work threads", len(tasks), god.WorkThreads)
 	cycle := common.MultiTaskCycle{
 		Threads:   god.WorkThreads,
 		TryOnFail: true,

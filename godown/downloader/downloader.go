@@ -10,7 +10,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 )
 
 /**
@@ -106,6 +105,25 @@ func (d *AbstractDownloader) HttpDown(req *http.Request, dist string) error {
 	return nil
 }
 
+func (d *AbstractDownloader) HttpDownWithProgress(req *http.Request, dist string) error {
+	resp, err := d.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	d.PrepareDist(dist)
+	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
+	if e != nil {
+		return e
+	}
+	pr := &ProgressReader{resp.Body, &d.CommonProgress}
+	_, e = io.Copy(distFile, pr)
+	if e != nil {
+		return e
+	}
+	return nil
+}
+
 /**
 可以更新进度条的reader
 */
@@ -157,25 +175,22 @@ m3u8 下载器
 暂不支持加密格式，未进行格式转换
 支持多线程并发下载，默认线程数为5
 todo 已知设计BUG： 当因网络链接之类的问题导致下载确实无法进行时会无限次数重试。
-todo 使用common中的线程循环来简化代码 - 未测试
 */
 type M3u8Downloader struct {
 	AbstractDownloader
 	Threads int
-	//tsLock  *sync.Mutex
 }
-
-//type tsTask struct {
-//	baseUrl, distDir, tsUrl string
-//}
 
 func (d *M3u8Downloader) Download(urlstr, dist string) (string, error) {
 	d.Init()
 	if d.Threads == 0 {
 		d.Threads = 5
 	}
-	tsdir := path.Join(path.Dir(dist), "ts"+strconv.Itoa(int(time.Now().Unix())))
-	d.PrepareDist(tsdir)
+	d.PrepareDist(dist)
+	tsdir, err := ioutil.TempDir(path.Dir(dist), "ts*")
+	if err != nil {
+		return "", err
+	}
 	m3u8File, err := d.FetchText(quickRequest(http.MethodGet, urlstr, nil))
 	if err != nil {
 		return "", err
@@ -203,6 +218,7 @@ func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
 		tsFile.Close()
 		os.Remove(tsPath)
 	}
+	os.Remove(tsdir)
 
 }
 
@@ -232,24 +248,6 @@ func (d *M3u8Downloader) doDownload(tsList []string, baseUrl, tsdir string) {
 	cycle.CostTasks(taskSet)
 }
 
-//func (d *M3u8Downloader) downloadGoChan(group *sync.WaitGroup, tsCh chan *tsTask, doneCh chan int) {
-//	for {
-//		select {
-//		case ts := <-tsCh:
-//			tsUrl := strings.Join([]string{ts.baseUrl, ts.tsUrl}, "/")
-//			tsDist := path.Join(ts.distDir, GetUrlFileName(ts.tsUrl))
-//			if err := d.HttpDown(quickRequest(http.MethodGet, tsUrl, nil), tsDist); err != nil {
-//				tsCh <- ts
-//			} else {
-//				d.UpdateProgress(1)
-//				group.Done()
-//			}
-//		case <-doneCh:
-//			break
-//		}
-//	}
-//}
-
 func (d *M3u8Downloader) parseTsList(m3u8 string) []string {
 	baseList := strings.Split(m3u8, "\n")
 	distList := []string{}
@@ -261,4 +259,98 @@ func (d *M3u8Downloader) parseTsList(m3u8 string) []string {
 		}
 	}
 	return distList
+}
+
+/**
+一个更好的Http下载器，适用于下载大文件
+支持分块下载
+*/
+type MultipartHttpDownloader struct {
+	AbstractDownloader
+	headers http.Header
+	Threads int
+}
+
+var MB = 1024 * 1024
+
+func (d *MultipartHttpDownloader) Download(urlstr string, dist string) (string, error) {
+	d.PrepareDist(dist)
+	// 先检测是否可以使用分块下载
+	h1 := http.Header{}
+	h1.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Safari/537.36")
+	h1.Add("Range", "bytes=0-10")
+	resp, err := d.Client.Do(quickRequest(http.MethodGet, urlstr, h1))
+	if err != nil {
+		return "", err
+	}
+	code := resp.StatusCode
+	contentLength := 0
+	parts := 1
+	if code == 206 { // support multipart transport
+		cr := resp.Header.Get("Content-Range")
+		contentLength, err := strconv.Atoi(cr[strings.LastIndex(cr, "/")+1:])
+		if err != nil {
+			return "", err
+		}
+		if contentLength < 5*MB {
+			parts = 1
+		} else {
+			parts = contentLength/MB/5 + 1
+		}
+	} else {
+		fmt.Println("[Multipart Downloader] server not support, use httpdown method")
+	}
+	if parts == 1 {
+		fmt.Println("[Multipart Downloader] quick down!")
+		err := d.HttpDownWithProgress(quickRequest(http.MethodGet, urlstr, nil), dist)
+		return dist, err
+	}
+	dir := path.Dir(dist)
+	cache, err := ioutil.TempDir(dir, "multipart*")
+	tasks := []func() error{}
+	d.InitProgress(int64(contentLength), true)
+	for i := 0; i < parts; i++ {
+		s, e := i*5*MB, (i+1)*5*MB-1
+		partHeader := http.Header{}
+		partHeader.Add("Range", fmt.Sprintf("bytes=%d-%d", s, e))
+		partDist := path.Join(cache, fmt.Sprintf("%d.part", i))
+		tasks = append(tasks, func() error {
+			err = d.HttpDownWithProgress(quickRequest(http.MethodGet, urlstr, partHeader), partDist)
+			if err != nil {
+				return err
+			} else {
+				d.UpdateProgress(1)
+				return nil
+			}
+		})
+	}
+	if d.Threads == 0 {
+		d.Threads = 5
+	}
+	cycle := common.MultiTaskCycle{
+		Threads:   d.Threads,
+		TryOnFail: true,
+	}
+	cycle.CostTasks(tasks)
+	d.combineParts(cache, dist, parts)
+	return dist, nil
+}
+
+func (d *MultipartHttpDownloader) combineParts(partDir, dist string, parts int) {
+	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
+	defer distFile.Close()
+	if e != nil {
+		panic(e)
+	}
+	for i := 0; i < parts; i++ {
+		partDist := path.Join(partDir, fmt.Sprintf("%d.part", i))
+		partFile, e := os.OpenFile(partDist, os.O_RDONLY, 0777)
+		if e != nil {
+			panic(e)
+		}
+		io.Copy(distFile, partFile)
+		partFile.Close()
+		os.Remove(partDist)
+	}
+	os.Remove(partDir)
 }

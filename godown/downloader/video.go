@@ -53,17 +53,17 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 		// 只下载第一个，所以如果要做优选，则需要在解析器内进行排序
 		info, err := extrator(urlStr, &vd.AbstractDownloader)
 		if err != nil {
+			panic(err)
 			return "", nil
 		}
 		distExt := filepath.Ext(dist)
 		distPath := dist
 		if info.name != "" {
-			videoName := FormatFilename(info.name) + "." + distExt
+			videoName := FormatFilename(info.name) + distExt
 			distPath = path.Join(filepath.Dir(dist), videoName)
 		}
 		realDist = distPath
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
-		fmt.Println("[Video Downloader] download video src: ", info.infos[0].url)
 		fmt.Println("[Video Downloader] download video dist ext: ", distExt)
 		if info.infos[0].ext == "hls" {
 			m3u8d := M3u8Downloader{
@@ -90,11 +90,12 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 				m3u8d.Download(info.infos[0].url, distPath)
 			}
 		} else {
-			httpd := HttpDownloader{Header: info.infos[0].headers}
+			httpd := MultipartHttpDownloader{headers: info.infos[0].headers}
 			httpd.Client = vd.Client
 			httpd.Download(info.infos[0].url, distPath)
 		}
 	} else {
+		fmt.Println("[Video Downloader] Unsupport video source:", host)
 		err = fmt.Errorf("Unsupport video source!")
 		return
 	}
@@ -278,9 +279,12 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 
 	vm := otto.New()
 	_, e = vm.Run(script)
-	if e != nil {
-		return
-	}
+	// 可能有错，但是不影响获取flashvars_
+	//if e != nil {
+	//	fmt.Println("DEBUG: otto run bug! script:")
+	//	fmt.Println(script)
+	//	return
+	//}
 	value, e := vm.Get("flashvars_" + info.id)
 	object, e := value.Export()
 	objMapper := object.(map[string]interface{})
@@ -293,9 +297,9 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 			continue
 		}
 		ext := v["format"].(string)
-		if ext == "mp4" { // 只下载m3u8
-			continue
-		}
+		//if ext == "mp4" { // 只下载m3u8
+		//	continue
+		//}
 		vurl := v["videoUrl"].(string)
 		if ext == "hls" {
 			master, err := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))

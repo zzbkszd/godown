@@ -21,7 +21,7 @@ type ProgressAble interface {
 */
 type CommonProgress struct {
 	DisplayProgress bool               // 是否在终端打印进度信息（pb)
-	DisplayOnUpdate bool               // 是否在更新时打印进度比例（字符）
+	DisplayOnUpdate bool               // 是否在更新时打印进度比例（done/total）
 	progressChan    chan *ProgressInfo // 进度回调
 	progressInfo    *ProgressInfo      // 当前的进度信息
 	progressMutex   *sync.Mutex        // 更新进度信息的互斥锁
@@ -88,7 +88,7 @@ func (d *CommonProgress) CloseProgress() {
 }
 
 /**
-多线程任务循环
+多线程任务集合，一个没什么卵用的玩意
 */
 type TaskSet []func() error
 
@@ -96,6 +96,15 @@ func (set TaskSet) Add(task func() error) []func() error {
 	return append(set, task)
 }
 
+/**
+多任务并发循环模板代码
+采用生产-消费者模式
+可选的，在任务执行报错的时候是否进行重试（TryOnFail)
+支持指定数量的消费者协程并发处理任务列表
+两种模式：
+- 一次输入整个任务列表，阻塞至处理完成 （CostTasks)
+- 开启一个循环，并向队列输入任务，输入完成后手动结束循环。(PushTask)
+*/
 type MultiTaskCycle struct {
 	taskCh  chan func() error
 	doneCh  chan int

@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"fmt"
+	"github.com/zzbkszd/godown/godown/common"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"path"
 	"regexp"
@@ -64,8 +65,24 @@ func TestEhentai(t *testing.T) {
 	d := EhentaiDonwloader{}
 	d.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
 	d.DisplayProgress = true
-	err := d.Download("https://e-hentai.org/g/1597700/21efbef24d/", "../../data/ehentai")
+	_, err := d.Download("https://e-hentai.org/g/1597700/21efbef24d/", "../../data/ehentai")
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestMultiPart(t *testing.T) {
+	multipart := MultipartHttpDownloader{
+		AbstractDownloader: AbstractDownloader{
+			Client: shadownet.GetShadowClient(shadownet.LocalShadowConfig),
+			CommonProgress: common.CommonProgress{
+				DisplayProgress: true,
+				DisplayOnUpdate: false,
+			},
+			//Client: http.DefaultClient,
+		},
+	}
+	testUrl := "https://ev.phncdn.com/videos/201910/25/257052331/1080P_4000K_257052331.mp4?validfrom=1585743174&validto=1585750374&rate=50000k&burst=50000k&ip=149.28.25.5&hash=cnop4pyaDUtCMrP7MtkqQOPFzRQ%3D"
+	//testUrl := "https://www.baidu.com"
+	multipart.Download(testUrl, "../../data/test.mp4")
 }
