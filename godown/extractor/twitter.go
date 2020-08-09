@@ -1,9 +1,10 @@
-package downloader
+package extractor
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/tidwall/gjson"
+	"github.com/zzbkszd/godown/downloader"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -22,7 +23,7 @@ twitter 下载器
 类似的可以用于新浪微博之类
 */
 type TwitterDonwloader struct {
-	AbstractDownloader
+	downloader.AbstractDownloader
 	api *twitterApi
 }
 
@@ -48,22 +49,22 @@ func (td *TwitterDonwloader) Download(urlStr string, dist string) (string, error
 		return "", e
 	}
 	for idx, u := range info.Picture {
-		mname := info.Id + "." + GetUrlFileName(u)
+		mname := info.Id + "." + downloader.GetUrlFileName(u)
 		md := path.Join(dist, mname)
-		td.HttpDown(quickRequest(http.MethodGet, u, nil), md)
+		td.HttpDown(downloader.quickRequest(http.MethodGet, u, nil), md)
 		info.Picture[idx] = mname
 	}
 	for idx, u := range info.Video {
-		mname := info.Id + "." + GetUrlFileName(u)
+		mname := info.Id + "." + downloader.GetUrlFileName(u)
 		if strings.HasSuffix(mname, "m3u8") {
-			m3u8d := M3u8Downloader{}
+			m3u8d := downloader.M3u8Downloader{}
 			m3u8d.Client = td.Client
 			mname = mname + ".ts"
 			md := path.Join(dist, mname)
 			m3u8d.Download(u, md)
 		} else {
 			md := path.Join(dist, mname)
-			httpd := HttpDownloader{}
+			httpd := downloader.HttpDownloader{}
 			httpd.Client = td.Client
 			httpd.Download(u, md)
 		}
@@ -79,7 +80,7 @@ func (td *TwitterDonwloader) Download(urlStr string, dist string) (string, error
 }
 
 type twitterApi struct {
-	AbstractDownloader
+	downloader.AbstractDownloader
 	gustTokenMu sync.Mutex
 	guestToken  string
 }

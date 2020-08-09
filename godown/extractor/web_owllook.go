@@ -1,10 +1,11 @@
-package downloader
+package extractor
 
 import (
 	"bufio"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/cheggaaa/pb/v3"
+	"github.com/zzbkszd/godown/downloader"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,7 +19,7 @@ import (
 // 注意该网站就他娘的可以用http爬取，服务端对于https的跨域支持有问题
 // 并发抓取会导致请求被拦截，所以目前只用单线程慢慢爬
 type OwllookDonwloader struct {
-	AbstractDownloader
+	downloader.AbstractDownloader
 	chapters []string
 	names    []string
 }

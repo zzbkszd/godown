@@ -1,9 +1,10 @@
-package downloader
+package extractor
 
 import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/zzbkszd/godown/godown/common"
+	common2 "github.com/zzbkszd/godown/common"
+	"github.com/zzbkszd/godown/downloader"
 	"net/http"
 	"path"
 	"strconv"
@@ -16,7 +17,7 @@ e-hentai下载器
 输出：在目标目录输出所有图片
 */
 type EhentaiDonwloader struct {
-	AbstractDownloader
+	downloader.AbstractDownloader
 	api *twitterApi
 }
 
@@ -35,13 +36,13 @@ func (ed *EhentaiDonwloader) Download(src, dist string) (string, error) {
 			if err != nil {
 				return err
 			}
-			pname := strconv.Itoa(lp) + "_" + GetUrlFileName(pic)
-			err = ed.HttpDown(quickRequest(http.MethodGet, pic, nil), path.Join(dist, pname))
+			pname := strconv.Itoa(lp) + "_" + downloader.GetUrlFileName(pic)
+			err = ed.HttpDown(downloader.QuickRequest(http.MethodGet, pic, nil), path.Join(dist, pname))
 			ed.UpdateProgress(1)
 			return err
 		})
 	}
-	cycle := &common.MultiTaskCycle{
+	cycle := &common2.MultiTaskCycle{
 		Threads: 5,
 	}
 	err = cycle.CostTasks(tasks)
@@ -51,7 +52,7 @@ func (ed *EhentaiDonwloader) Download(src, dist string) (string, error) {
 }
 
 func (ed *EhentaiDonwloader) ehentaiExtractor(listUrl string) ([]string, error) {
-	listPage, err := ed.FetchText(quickRequest(http.MethodGet, listUrl, nil))
+	listPage, err := ed.FetchText(downloader.QuickRequest(http.MethodGet, listUrl, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (ed *EhentaiDonwloader) ehentaiExtractor(listUrl string) ([]string, error) 
 }
 
 func (ed *EhentaiDonwloader) ehentaiSingleLst(listUrl string) ([]string, error) {
-	listPage, err := ed.FetchText(quickRequest(http.MethodGet, listUrl, nil))
+	listPage, err := ed.FetchText(downloader.QuickRequest(http.MethodGet, listUrl, nil))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func (ed *EhentaiDonwloader) ehentaiSingleLst(listUrl string) ([]string, error) 
 }
 
 func (ed *EhentaiDonwloader) ehentaiParsePicture(src string) (string, error) {
-	picPage, err := ed.FetchText(quickRequest(http.MethodGet, src, nil))
+	picPage, err := ed.FetchText(downloader.QuickRequest(http.MethodGet, src, nil))
 	if err != nil {
 		return "", err
 	}

@@ -2,8 +2,9 @@ package godown
 
 import (
 	"fmt"
-	"github.com/zzbkszd/godown/godown/common"
-	"github.com/zzbkszd/godown/godown/downloader"
+	common2 "github.com/zzbkszd/godown/common"
+	downloader2 "github.com/zzbkszd/godown/downloader"
+	"github.com/zzbkszd/godown/godown/extractor"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"os"
 	"path"
@@ -22,9 +23,9 @@ type Godown struct {
 下载一个集合，下载完成后就结束
 */
 func (god *Godown) DownloadCollect(collect *Collect) error {
-	fmt.Println("[GoDown] initial collect downloader")
+	fmt.Println("[GoDown] initial collect extractor")
 	collectBase := path.Join(god.DataPath, "collect", collect.Name)
-	pg := &common.CommonProgress{
+	pg := &common2.CommonProgress{
 		DisplayProgress: false,
 		DisplayOnUpdate: true,
 	}
@@ -40,22 +41,22 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 	//client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
 	client := shadownet.GetLocalClient()
 	for idx, task := range collect.Source {
-		var downer downloader.Downloader
-		name := downloader.GetUrlFileName(task)
+		var downer downloader2.Downloader
+		name := downloader2.GetUrlFileName(task)
 		switch collect.Type {
 		case TYPE_VIDEO:
-			downer = &downloader.VideoDonwloader{
+			downer = &extractor.VideoDonwloader{
 				AutoName: true,
-				AbstractDownloader: downloader.AbstractDownloader{
+				AbstractDownloader: downloader2.AbstractDownloader{
 					Client: client,
-					CommonProgress: common.CommonProgress{
+					CommonProgress: common2.CommonProgress{
 						DisplayProgress: true,
 					},
 				},
 			}
 			name = fmt.Sprintf("%d.%s", idx, god.DefaultVideoFormat)
 		case TYPE_TWITTER:
-			downer = &downloader.TwitterDonwloader{}
+			downer = &extractor.TwitterDonwloader{}
 			downer.SetClient(client)
 		}
 
@@ -71,8 +72,8 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 	if god.WorkThreads == 0 {
 		god.WorkThreads = 5
 	}
-	fmt.Printf("[GoDown] downloader initialed, %d tasks and %d work threads\n", len(tasks), god.WorkThreads)
-	cycle := common.MultiTaskCycle{
+	fmt.Printf("[GoDown] extractor initialed, %d tasks and %d work threads\n", len(tasks), god.WorkThreads)
+	cycle := common2.MultiTaskCycle{
 		Threads:   god.WorkThreads,
 		TryOnFail: true,
 	}

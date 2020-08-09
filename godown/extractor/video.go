@@ -1,4 +1,4 @@
-package downloader
+package extractor
 
 import (
 	"context"
@@ -7,7 +7,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/robertkrimen/otto"
 	"github.com/tidwall/gjson"
-	"github.com/zzbkszd/godown/godown/common"
+	common2 "github.com/zzbkszd/godown/common"
+	"github.com/zzbkszd/godown/downloader"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,7 +30,7 @@ var ffmpeg_codec = "copy" // 快速复制
 go 版本的 youtube-dl 简单实现。
 解析代码参照 youtube-dl的 extract 源码
 */
-var extractMapper = map[string]func(url string, downloader *AbstractDownloader) (*VideoInfo, error){
+var extractMapper = map[string]func(url string, downloader *downloader.AbstractDownloader) (*VideoInfo, error){
 	"www.bilibili.com": bilibiliExtractor,
 	"www.xvideos.com":  xvideosExtractor,
 	"cn.pornhub.com":   pornhubExtractor,
@@ -37,9 +38,9 @@ var extractMapper = map[string]func(url string, downloader *AbstractDownloader) 
 }
 
 type VideoDonwloader struct {
-	AbstractDownloader
+	downloader.AbstractDownloader
 	sourceUrl string // 来源网站
-	extract   func(url string, vd *AbstractDownloader) (*VideoInfo, error)
+	extract   func(url string, vd *downloader.AbstractDownloader) (*VideoInfo, error)
 	AutoName  bool // 是否从目标网站自动读取文件名，若是则不使用指定文件名
 	// 但是无论如何dist中都要指定一个默认文件名
 }
@@ -60,22 +61,22 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 		distExt := filepath.Ext(dist)
 		distPath := dist
 		if info.name != "" {
-			videoName := FormatFilename(info.name) + distExt
+			videoName := downloader.FormatFilename(info.name) + distExt
 			distPath = path.Join(filepath.Dir(dist), videoName)
 		}
 		realDist = distPath
-		if checkFileExists(distPath) {
+		if downloader.CheckFileExists(distPath) {
 			fmt.Printf("[Video Downloader] dist file %s is exists, skip this task\n", distPath)
 			return distPath, nil
 		}
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
 		fmt.Println("[Video Downloader] download video dist ext: ", distExt)
 		if info.infos[0].ext == "hls" {
-			m3u8d := M3u8Downloader{
+			m3u8d := downloader.M3u8Downloader{
 				Threads: 5,
-				AbstractDownloader: AbstractDownloader{
+				AbstractDownloader: downloader.AbstractDownloader{
 					Client: vd.Client,
-					CommonProgress: common.CommonProgress{
+					CommonProgress: common2.CommonProgress{
 						DisplayProgress: vd.DisplayProgress,
 					},
 				},
@@ -101,12 +102,12 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 				}
 			}
 		} else {
-			httpd := MultipartHttpDownloader{
-				headers: info.infos[0].headers,
+			httpd := downloader.MultipartHttpDownloader{
+				Headers: info.infos[0].headers,
 				Threads: 5,
-				AbstractDownloader: AbstractDownloader{
+				AbstractDownloader: downloader.AbstractDownloader{
 					Client: vd.Client,
-					CommonProgress: common.CommonProgress{
+					CommonProgress: common2.CommonProgress{
 						DisplayProgress: vd.DisplayProgress,
 					},
 				}}
@@ -159,13 +160,13 @@ bilibili support
 only video as https://www.bilibili.com/video/av83641887
 todo support bangumi url as : https://www.bilibili.com/bangumi/play/ss32381
 */
-func bilibiliExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo, e error) {
+func bilibiliExtractor(videoUrl string, vd *downloader.AbstractDownloader) (info *VideoInfo, e error) {
 	_APP_KEY := "iVGUTjsxvpLeuDCf"
 	_BILIBILI_KEY := "aHRmhWMLkdeMuILqORnYZocwMBpMEOdt"
 	info = &VideoInfo{src: videoUrl}
 	id := videoUrl[strings.LastIndex(videoUrl, "/")+3:]
 	info.id = id
-	webpage, e := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	webpage, e := vd.FetchText(downloader.QuickRequest(http.MethodGet, videoUrl, nil))
 	if e != nil {
 		return nil, e
 	}
@@ -181,7 +182,7 @@ func bilibiliExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo
 		payload := fmt.Sprintf("appkey=%s&cid=%s&otype=json&%s", _APP_KEY, cid, rendition)
 		sign := fmt.Sprintf("%x", (md5.Sum([]byte(payload + _BILIBILI_KEY))))
 		apiCall := fmt.Sprintf("http://interface.bilibili.com/v2/playurl?%s&sign=%s", payload, sign)
-		respJsonStr, e := vd.FetchText(quickRequest(http.MethodGet, apiCall, nil))
+		respJsonStr, e := vd.FetchText(downloader.QuickRequest(http.MethodGet, apiCall, nil))
 		if e != nil {
 			return nil, e
 		}
@@ -209,9 +210,9 @@ func bilibiliExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo
 /**
 xvideos support
 */
-func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo, e error) {
+func xvideosExtractor(videoUrl string, vd *downloader.AbstractDownloader) (info *VideoInfo, e error) {
 	info = &VideoInfo{src: videoUrl}
-	webpage, e := vd.FetchText(quickRequest(http.MethodGet, videoUrl, nil))
+	webpage, e := vd.FetchText(downloader.QuickRequest(http.MethodGet, videoUrl, nil))
 	if e != nil {
 		return nil, e
 	}
@@ -231,7 +232,7 @@ func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 			ext = "mp4"
 			break
 		case "HLS": //  hls需要先下载hls列表，再下载hls文件
-			hlsPage, e := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))
+			hlsPage, e := vd.FetchText(downloader.QuickRequest(http.MethodGet, vurl, nil))
 			if e != nil {
 				continue
 			}
@@ -242,7 +243,7 @@ func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 				if len(line) == 0 || strings.HasPrefix(line, "#") {
 					continue
 				} else {
-					vurl = getParentUrl(vurl) + "/" + line
+					vurl = downloader.GetParentUrl(vurl) + "/" + line
 					ext = "hls"
 					break
 				}
@@ -270,12 +271,12 @@ func xvideosExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 pornhub support
 thanks for https://github.com/treant5612/pornhub-dl
 */
-func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo, e error) {
+func pornhubExtractor(videoUrl string, vd *downloader.AbstractDownloader) (info *VideoInfo, e error) {
 	info = &VideoInfo{src: videoUrl}
 	getWebpage := func(plat string) (r string, e error) {
 		header := http.Header{}
 		header.Set("Cookie", fmt.Sprintf("platform=%s;", plat))
-		r, e = vd.FetchText(quickRequest(http.MethodGet, videoUrl, header))
+		r, e = vd.FetchText(downloader.QuickRequest(http.MethodGet, videoUrl, header))
 		return
 	}
 	webpage, e := getWebpage("pc")
@@ -325,7 +326,7 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 		}
 		vurl := v["videoUrl"].(string)
 		if ext == "hls" {
-			master, err := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))
+			master, err := vd.FetchText(downloader.QuickRequest(http.MethodGet, vurl, nil))
 			if err != nil {
 				return nil, err
 			}
@@ -335,7 +336,7 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 				if len(line) == 0 || strings.HasPrefix(line, "#") {
 					continue
 				} else {
-					vurl = getParentUrl(vurl) + "/" + line
+					vurl = downloader.GetParentUrl(vurl) + "/" + line
 					ext = "hls"
 					break
 				}

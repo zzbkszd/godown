@@ -1,16 +1,18 @@
-package downloader
+package extractor
 
 import (
 	"fmt"
-	"github.com/zzbkszd/godown/godown/common"
+	common2 "github.com/zzbkszd/godown/common"
+	"github.com/zzbkszd/godown/downloader"
 	"github.com/zzbkszd/godown/godown/shadownet"
+	"net/http"
 	"path"
 	"regexp"
 	"testing"
 )
 
 func TestUrlCutter(t *testing.T) {
-	name := GetUrlFileName("https://www.xvideos.com/video44476201/_")
+	name := downloader.GetUrlFileName("https://www.xvideos.com/video44476201/_")
 	fmt.Println(name)
 }
 
@@ -26,25 +28,13 @@ func TestVideoDownlaod(t *testing.T) {
 	vd := VideoDonwloader{}
 	// 这个……下载速度……贼尼玛不科学！
 	vd.Download("https://cn.pornhub.com/view_video.php?viewkey=ph5db26265db653",
-		"../../data/dist.mp4")
+		"I:\\godown\\dist.mp4")
 }
 
-func TestM3u8Download(t *testing.T) {
-	md := M3u8Downloader{
-		AbstractDownloader: AbstractDownloader{
-			CommonProgress: common.CommonProgress{
-				DisplayProgress: false,
-				DisplayOnUpdate: true,
-			},
-		},
-	}
-	md.Download("http://hknm5s6gzvm5a6wju24.exp.bcevod.com/mda-kepxy20tjhjwx488/mda-kepxy20tjhjwx488.m3u8",
-		"../../edu/4_6我们爱和平2.mp4")
-}
-
-func testExtractor(url string, extractor func(string, *AbstractDownloader) (*VideoInfo, error)) {
+func testExtractor(url string, extractor func(string, *downloader.AbstractDownloader) (*VideoInfo, error)) {
 	vd := VideoDonwloader{}
-	vd.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	//vd.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	vd.Client = http.DefaultClient
 	exts, err := extractor(url, &vd.AbstractDownloader)
 	if err != nil {
 		panic(err)
@@ -85,10 +75,10 @@ func TestEhentai(t *testing.T) {
 }
 
 func TestMultiPart(t *testing.T) {
-	multipart := MultipartHttpDownloader{
-		AbstractDownloader: AbstractDownloader{
+	multipart := downloader.MultipartHttpDownloader{
+		AbstractDownloader: downloader.AbstractDownloader{
 			Client: shadownet.GetShadowClient(shadownet.LocalShadowConfig),
-			CommonProgress: common.CommonProgress{
+			CommonProgress: common2.CommonProgress{
 				DisplayProgress: true,
 				DisplayOnUpdate: false,
 			},

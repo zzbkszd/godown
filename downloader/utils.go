@@ -14,7 +14,7 @@ import (
 Some useful utils
 ************************** **/
 // simple and typical http request
-func quickRequest(method string, urlStr string, headers http.Header) (req *http.Request) {
+func QuickRequest(method string, urlStr string, headers http.Header) (req *http.Request) {
 	if headers == nil {
 		headers = shadownet.DefaultHeader
 	} else {
@@ -29,7 +29,7 @@ func quickRequest(method string, urlStr string, headers http.Header) (req *http.
 	return req
 }
 
-func getParentUrl(base string) string {
+func GetParentUrl(base string) string {
 	parent := strings.Split(base, "/")
 	return strings.Join(parent[:len(parent)-1], "/")
 }
@@ -58,7 +58,7 @@ func FormatFilename(name string) (formated string) {
 	return reg.ReplaceAllString(name, `_`)
 }
 
-func checkFileExists(filepath string) bool {
+func CheckFileExists(filepath string) bool {
 	_, err := os.Stat(filepath)
 	// 简单粗暴的判断，其实ERR可能有很多种情况
 	return err == nil
