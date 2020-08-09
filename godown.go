@@ -41,20 +41,20 @@ func videoTrans(src string, dist string) error {
 }
 
 func downloadFileCollect(file string) {
-	collect, err := godown.ListFileCollect(file, godown.TYPE_VIDEO, 2)
+	collect, err := godown.ListFileCollect(file, godown.TYPE_VIDEO, 5)
 	if err != nil {
 		panic(err)
 	}
 	ctx := godown.Godown{
-		DataPath:           path.Join("..", "data"),
+		DataPath:           path.Join("..", "data", "0507data"),
 		WorkThreads:        1,
-		DefaultVideoFormat: "ts",
+		DefaultVideoFormat: "mp4",
 	}
 
 	ctx.DownloadCollect(collect)
 }
 
 func main() {
-	transVideoAll(`../data/collect/jump.dat`)
-	//downloadFileCollect("data/jump.dat")
+	//transVideoAll(`../data/collect/jump.dat`)
+	downloadFileCollect("data/0507/歌迪斯")
 }

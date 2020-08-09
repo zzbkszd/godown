@@ -97,6 +97,7 @@ func fetchLncn() []ShadowProxyInfo {
 		panic(err)
 	}
 	context, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(context))
 	ssrs64 := gjson.Get(string(context), "ssrs")
 	key64 := gjson.Get(string(context), "ip")
 	key, _ := base64.RawStdEncoding.DecodeString(key64.String())

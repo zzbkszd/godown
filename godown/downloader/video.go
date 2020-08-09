@@ -20,7 +20,8 @@ import (
 )
 
 // ffmpeg 视频编码器
-var ffmpeg_codec = "h264_qsv" // 适用于intel核显的硬件加速
+//var ffmpeg_codec = "h264_qsv" // 适用于intel核显的硬件加速
+var ffmpeg_codec = "copy" // 快速复制
 
 /**
 视频下载器
@@ -54,7 +55,7 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 		info, err := extrator(urlStr, &vd.AbstractDownloader)
 		if err != nil {
 			panic(err)
-			return "", nil
+			return "", err
 		}
 		distExt := filepath.Ext(dist)
 		distPath := dist
@@ -63,6 +64,10 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 			distPath = path.Join(filepath.Dir(dist), videoName)
 		}
 		realDist = distPath
+		if checkFileExists(distPath) {
+			fmt.Printf("[Video Downloader] dist file %s is exists, skip this task\n", distPath)
+			return distPath, nil
+		}
 		fmt.Println("[Video Downloader] download video ext: ", info.infos[0].ext)
 		fmt.Println("[Video Downloader] download video dist ext: ", distExt)
 		if info.infos[0].ext == "hls" {
@@ -79,25 +84,39 @@ func (vd *VideoDonwloader) Download(urlStr string, dist string) (realDist string
 			if distExt != ".ts" {
 				tempDist := path.Join(path.Dir(distPath),
 					fmt.Sprintf("temp.%d.ts", int(time.Now().Unix())))
-				m3u8d.Download(info.infos[0].url, tempDist)
-				err := vd.videoTrans(tempDist, distPath)
+				_, err = m3u8d.Download(info.infos[0].url, tempDist)
+				if err != nil {
+					return "", err
+				}
+				err = vd.videoTrans(tempDist, distPath)
 				if err == nil {
 					os.Remove(tempDist)
 				} else {
-					return "", nil
+					return "", err
 				}
 			} else {
-				m3u8d.Download(info.infos[0].url, distPath)
+				_, err = m3u8d.Download(info.infos[0].url, distPath)
+				if err != nil {
+					return "", err
+				}
 			}
 		} else {
-			httpd := MultipartHttpDownloader{headers: info.infos[0].headers}
+			httpd := MultipartHttpDownloader{
+				headers: info.infos[0].headers,
+				Threads: 5,
+				AbstractDownloader: AbstractDownloader{
+					Client: vd.Client,
+					CommonProgress: common.CommonProgress{
+						DisplayProgress: vd.DisplayProgress,
+					},
+				}}
 			httpd.Client = vd.Client
 			httpd.Download(info.infos[0].url, distPath)
 		}
 	} else {
 		fmt.Println("[Video Downloader] Unsupport video source:", host)
 		err = fmt.Errorf("Unsupport video source!")
-		return
+		return "", err
 	}
 	return
 }
@@ -108,7 +127,7 @@ func (vd *VideoDonwloader) videoTrans(src string, dist string) error {
 	ctx := context.Background()
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", "-i", absSrc, "-c:v",
-		ffmpeg_codec, "-c:a", "aac", absDist)
+		ffmpeg_codec, "-c:a", "copy", absDist)
 	cmd.Start()
 	//done := ctx.Done()
 	fmt.Println("[Video Downloader] video format decode start!")
@@ -263,6 +282,10 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 	if e != nil {
 		return nil, e
 	}
+
+	// debug
+	//ioutil.WriteFile("data/dist.html", []byte(webpage), 0777)
+	//
 	document, _ := goquery.NewDocumentFromReader(strings.NewReader(webpage))
 	if title, ok := document.Find("[property='og:title']").Attr("content"); ok {
 		info.name = title
@@ -297,9 +320,9 @@ func pornhubExtractor(videoUrl string, vd *AbstractDownloader) (info *VideoInfo,
 			continue
 		}
 		ext := v["format"].(string)
-		//if ext == "mp4" { // 只下载m3u8
-		//	continue
-		//}
+		if ext == "mp4" { // 只下载m3u8
+			continue
+		}
 		vurl := v["videoUrl"].(string)
 		if ext == "hls" {
 			master, err := vd.FetchText(quickRequest(http.MethodGet, vurl, nil))

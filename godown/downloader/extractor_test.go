@@ -29,6 +29,19 @@ func TestVideoDownlaod(t *testing.T) {
 		"../../data/dist.mp4")
 }
 
+func TestM3u8Download(t *testing.T) {
+	md := M3u8Downloader{
+		AbstractDownloader: AbstractDownloader{
+			CommonProgress: common.CommonProgress{
+				DisplayProgress: false,
+				DisplayOnUpdate: true,
+			},
+		},
+	}
+	md.Download("http://hknm5s6gzvm5a6wju24.exp.bcevod.com/mda-kepxy20tjhjwx488/mda-kepxy20tjhjwx488.m3u8",
+		"../../edu/4_6我们爱和平2.mp4")
+}
+
 func testExtractor(url string, extractor func(string, *AbstractDownloader) (*VideoInfo, error)) {
 	vd := VideoDonwloader{}
 	vd.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)

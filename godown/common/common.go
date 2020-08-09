@@ -151,6 +151,7 @@ func (m *MultiTaskCycle) workGo() {
 		case ts := <-m.taskCh:
 			err := ts()
 			if err != nil && m.TryOnFail {
+				fmt.Println("[CYCELE DEBUG] task run error:" + err.Error())
 				m.taskCh <- ts
 				continue
 			}
@@ -165,5 +166,5 @@ func (m *MultiTaskCycle) workGo() {
 
 func (m *MultiTaskCycle) initCh() {
 	m.doneCh = make(chan int, m.Threads)
-	m.taskCh = make(chan func() error, m.Threads)
+	m.taskCh = make(chan func() error, m.Threads*100)
 }

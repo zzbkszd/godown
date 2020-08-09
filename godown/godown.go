@@ -19,7 +19,7 @@ type Godown struct {
 }
 
 /**
-下载一个集合
+下载一个集合，下载完成后就结束
 */
 func (god *Godown) DownloadCollect(collect *Collect) error {
 	fmt.Println("[GoDown] initial collect downloader")
@@ -31,7 +31,14 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 	os.MkdirAll(collectBase, 0777)
 	pg.InitProgress(int64(len(collect.Source)), false)
 	tasks := []func() error{}
-	client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	//client := shadownet.GetShadowClient(&shadownet.ShadowConfig{
+	//	Ip:           "198.255.78.36",
+	//	Port:         8099,
+	//	Password:     "eIW0Dnk69454e6nSwuspv9DmS201tQ0D",
+	//	CryptoMethod: "aes-256-cfb",
+	//})
+	//client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	client := shadownet.GetLocalClient()
 	for idx, task := range collect.Source {
 		var downer downloader.Downloader
 		name := downloader.GetUrlFileName(task)
@@ -51,17 +58,20 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 			downer = &downloader.TwitterDonwloader{}
 			downer.SetClient(client)
 		}
+
 		ltask := task
 		tasks = append(tasks, func() error {
 			_, err := downer.Download(ltask, path.Join(collectBase, name))
-			pg.UpdateProgress(1)
+			if err == nil {
+				pg.UpdateProgress(1)
+			}
 			return err
 		})
 	}
 	if god.WorkThreads == 0 {
 		god.WorkThreads = 5
 	}
-	fmt.Printf("[GoDown] downloader initialed, %d tasks and %d work threads", len(tasks), god.WorkThreads)
+	fmt.Printf("[GoDown] downloader initialed, %d tasks and %d work threads\n", len(tasks), god.WorkThreads)
 	cycle := common.MultiTaskCycle{
 		Threads:   god.WorkThreads,
 		TryOnFail: true,

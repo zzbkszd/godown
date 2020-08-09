@@ -72,6 +72,9 @@ func (d *AbstractDownloader) FetchSize(req *http.Request) (int, error) {
 // 拉取文本内容
 func (d *AbstractDownloader) FetchText(req *http.Request) (string, error) {
 	resp, err := d.Client.Do(req)
+	if err != nil {
+		return "", err
+	}
 	if resp.Body == nil {
 		return "", fmt.Errorf("Abstract Downloader: fetch text fail: no response body")
 	}
@@ -79,9 +82,14 @@ func (d *AbstractDownloader) FetchText(req *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
+	}
+	if resp.StatusCode > 399 {
+		fmt.Println("[http text]" + string(buf))
+		return "", fmt.Errorf("Error http response code: %d", resp.StatusCode)
 	}
 	return string(buf), nil
 }
@@ -91,6 +99,11 @@ func (d *AbstractDownloader) HttpDown(req *http.Request, dist string) error {
 	resp, err := d.Client.Do(req)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode > 399 {
+		//buf, _ := ioutil.ReadAll(resp.Body)
+		//fmt.Println("[http down]" + string(buf))
+		return fmt.Errorf("Error http response code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	d.PrepareDist(dist)
@@ -197,11 +210,14 @@ func (d *M3u8Downloader) Download(urlstr, dist string) (string, error) {
 	}
 	tsList := d.parseTsList(m3u8File)
 	d.doDownload(tsList, urlstr, tsdir)
-	d.combinTs(tsList, dist, tsdir)
+	err = d.combinTs(tsList, dist, tsdir)
+	if err != nil {
+		return "", err
+	}
 	return dist, nil
 }
 
-func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
+func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) error {
 	fmt.Printf("[M3U8 Downloader] start combin ts data \n")
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
 	defer distFile.Close()
@@ -214,12 +230,23 @@ func (d *M3u8Downloader) combinTs(tsList []string, dist, tsdir string) {
 		if e != nil {
 			panic(e)
 		}
-		io.Copy(distFile, tsFile)
+		_, err := io.Copy(distFile, tsFile)
+		if err != nil {
+			panic(err)
+		}
 		tsFile.Close()
 		os.Remove(tsPath)
 	}
+	finfo, err := distFile.Stat()
+	if err != nil {
+		return err
+	}
+	fileLength := finfo.Size()
+	if fileLength < 1024*1024 {
+		return fmt.Errorf("file size too small: %s", dist)
+	}
 	os.Remove(tsdir)
-
+	return nil
 }
 
 func (d *M3u8Downloader) doDownload(tsList []string, baseUrl, tsdir string) {
@@ -252,6 +279,10 @@ func (d *M3u8Downloader) parseTsList(m3u8 string) []string {
 	baseList := strings.Split(m3u8, "\n")
 	distList := []string{}
 	for _, line := range baseList {
+		if strings.Contains(line, "head") {
+			fmt.Println("[DEBUG] guess this is a page:")
+			fmt.Println(m3u8)
+		}
 		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			continue
 		} else {
@@ -308,6 +339,7 @@ func (d *MultipartHttpDownloader) Download(urlstr string, dist string) (string, 
 	dir := path.Dir(dist)
 	cache, err := ioutil.TempDir(dir, "multipart*")
 	tasks := []func() error{}
+	fmt.Println("[MultipartDownloader]content length is:", contentLength)
 	d.InitProgress(int64(contentLength), true)
 	for i := 0; i < parts; i++ {
 		s, e := i*5*MB, (i+1)*5*MB-1
@@ -319,7 +351,6 @@ func (d *MultipartHttpDownloader) Download(urlstr string, dist string) (string, 
 			if err != nil {
 				return err
 			} else {
-				d.UpdateProgress(1)
 				return nil
 			}
 		})
@@ -332,13 +363,13 @@ func (d *MultipartHttpDownloader) Download(urlstr string, dist string) (string, 
 		TryOnFail: true,
 	}
 	cycle.CostTasks(tasks)
+	d.CloseProgress()
 	d.combineParts(cache, dist, parts)
 	return dist, nil
 }
 
 func (d *MultipartHttpDownloader) combineParts(partDir, dist string, parts int) {
 	distFile, e := os.OpenFile(dist, os.O_CREATE, 0777)
-	defer distFile.Close()
 	if e != nil {
 		panic(e)
 	}
@@ -352,5 +383,6 @@ func (d *MultipartHttpDownloader) combineParts(partDir, dist string, parts int) 
 		partFile.Close()
 		os.Remove(partDist)
 	}
+	distFile.Close()
 	os.Remove(partDir)
 }

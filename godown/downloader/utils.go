@@ -1,9 +1,11 @@
 package downloader
 
 import (
+	"fmt"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -18,7 +20,11 @@ func quickRequest(method string, urlStr string, headers http.Header) (req *http.
 	} else {
 		headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36")
 	}
-	req, _ = http.NewRequest(http.MethodGet, urlStr, nil)
+	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	if err != nil {
+		fmt.Println("[DEBUG] request url is: " + urlStr)
+		panic(err)
+	}
 	req.Header = headers
 	return req
 }
@@ -50,4 +56,10 @@ func GetUrlFileName(base string) string {
 func FormatFilename(name string) (formated string) {
 	reg := regexp.MustCompile(`[\\/:*?\"<>|]`)
 	return reg.ReplaceAllString(name, `_`)
+}
+
+func checkFileExists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	// 简单粗暴的判断，其实ERR可能有很多种情况
+	return err == nil
 }

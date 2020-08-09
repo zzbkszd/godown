@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +48,17 @@ var LocalShadowConfig *ShadowConfig = &ShadowConfig{
 	CryptoMethod: "aes-256-cfb",
 }
 
+func GetLocalClient() *http.Client {
+	proxyAddr, err := url.Parse("socks://localhost:1080")
+	if err != nil {
+		return nil
+	}
+	st := &http.Transport{
+		Proxy: http.ProxyURL(proxyAddr),
+	}
+	client := http.Client{Transport: st}
+	return &client
+}
 func GetShadowClient(config *ShadowConfig) *http.Client {
 	st := &http.Transport{
 		Proxy:                 nil,

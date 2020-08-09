@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"path"
 	"testing"
-	"time"
 )
 
 var testShadowConfig *ShadowConfig = &ShadowConfig{
@@ -64,7 +63,8 @@ func TestSimpleHttpGet(t *testing.T) {
 func TestProxy(t *testing.T) {
 
 	//go localSocketReader()
-	client := GetShadowClient(testShadowConfig)
+	//client := GetShadowClient(testShadowConfig)
+	client := GetLocalClient()
 	//client := http.DefaultClient
 	u, _ := url.Parse("https://www.google.com")
 	request := &http.Request{Method: http.MethodGet, URL: u, Header: DefaultHeader}
@@ -117,16 +117,20 @@ func TestECBDecrypt(t *testing.T) {
 
 func TestPool(t *testing.T) {
 
-	info := ShadowProxyInfo{
-		config: &ShadowConfig{
-			Ip:           "45.82.255.115",
-			Port:         5922,
-			Password:     "lncn.org 5tb",
-			CryptoMethod: "rc4",
-		},
-		enable:   false,
-		lastTest: time.Time{},
-		delay:    0,
+	//info := ShadowProxyInfo{
+	//	config: &ShadowConfig{
+	//		Ip:           "45.82.255.115",
+	//		Port:         5922,
+	//		Password:     "lncn.org 5tb",
+	//		CryptoMethod: "rc4",
+	//	},
+	//	enable:   false,
+	//	lastTest: time.Time{},
+	//	delay:    0,
+	//}
+	info := fetchLncn()
+	for _, i := range info {
+		fmt.Printf("ip: %s, port:%d, password:%s method:%s\n", i.config.Ip,
+			i.config.Port, i.config.Password, i.config.CryptoMethod)
 	}
-	fetchSStool(GetShadowClient(info.config))
 }
