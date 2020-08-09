@@ -160,6 +160,16 @@ type HttpDownloader struct {
 	Header http.Header
 }
 
+var DefaultHttpDownloader = HttpDownloader{
+	AbstractDownloader: AbstractDownloader{
+		Client: http.DefaultClient,
+		CommonProgress: common.CommonProgress{
+			DisplayProgress: false,
+			DisplayOnUpdate: true,
+		},
+	},
+}
+
 func (d *HttpDownloader) Download(urlstr string, dist string) (string, error) {
 	d.Init()
 	resp, err := d.Client.Do(QuickRequest(http.MethodGet, urlstr, d.Header))

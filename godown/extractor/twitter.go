@@ -51,7 +51,7 @@ func (td *TwitterDonwloader) Download(urlStr string, dist string) (string, error
 	for idx, u := range info.Picture {
 		mname := info.Id + "." + downloader.GetUrlFileName(u)
 		md := path.Join(dist, mname)
-		td.HttpDown(downloader.quickRequest(http.MethodGet, u, nil), md)
+		td.HttpDown(downloader.QuickRequest(http.MethodGet, u, nil), md)
 		info.Picture[idx] = mname
 	}
 	for idx, u := range info.Video {
