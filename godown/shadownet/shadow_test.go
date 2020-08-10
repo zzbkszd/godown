@@ -8,15 +8,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path"
 	"testing"
 )
 
 var testShadowConfig *ShadowConfig = &ShadowConfig{
-	Ip:           "45.82.255.115",
-	Port:         5922,
-	Password:     "lncn.org 5tb",
-	CryptoMethod: "rc4",
+	Ip:           "172.104.127.208",
+	Port:         8097,
+	Password:     "eIW0Dnk69454e6nSwuspv9DmS201tQ0D",
+	CryptoMethod: "aes-256-cfb",
 }
 
 func localSocketReader() {
@@ -63,8 +62,8 @@ func TestSimpleHttpGet(t *testing.T) {
 func TestProxy(t *testing.T) {
 
 	//go localSocketReader()
-	//client := GetShadowClient(testShadowConfig)
-	client := GetLocalClient()
+	client := GetShadowClient(testShadowConfig)
+	//client := GetLocalClient()
 	//client := http.DefaultClient
 	u, _ := url.Parse("https://www.google.com")
 	request := &http.Request{Method: http.MethodGet, URL: u, Header: DefaultHeader}
@@ -75,11 +74,7 @@ func TestProxy(t *testing.T) {
 	}
 	code := resp.Status
 	content, _ := ioutil.ReadAll(resp.Body)
-	e := ioutil.WriteFile(path.Join("..", "..", "data", "dist.html"), content, 0777)
-	if e != nil {
-		panic(e)
-	}
-
+	fmt.Println(string(content))
 	fmt.Println("response code:", code, resp.Request.Method)
 }
 
@@ -107,27 +102,9 @@ func TestECBDecrypt(t *testing.T) {
 	if result != dec {
 		t.Fail()
 	}
-	//for idx := range []byte(result) {
-	//	if result[idx] != dec[idx] {
-	//		fmt.Printf("res: %s, dec: %s", string(result[idx:idx+10]), string(dec[idx:idx+10]))
-	//		break
-	//	}
-	//}
 }
 
 func TestPool(t *testing.T) {
-
-	//info := ShadowProxyInfo{
-	//	config: &ShadowConfig{
-	//		Ip:           "45.82.255.115",
-	//		Port:         5922,
-	//		Password:     "lncn.org 5tb",
-	//		CryptoMethod: "rc4",
-	//	},
-	//	enable:   false,
-	//	lastTest: time.Time{},
-	//	delay:    0,
-	//}
 	info := fetchLncn()
 	for _, i := range info {
 		fmt.Printf("ip: %s, port:%d, password:%s method:%s\n", i.config.Ip,

@@ -59,6 +59,7 @@ func GetLocalClient() *http.Client {
 	client := http.Client{Transport: st}
 	return &client
 }
+
 func GetShadowClient(config *ShadowConfig) *http.Client {
 	st := &http.Transport{
 		Proxy:                 nil,
