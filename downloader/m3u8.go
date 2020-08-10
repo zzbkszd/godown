@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/zzbkszd/godown/common"
+	"github.com/zzbkszd/godown/common/crypto"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -23,8 +24,8 @@ type M3u8MetaData struct {
 	TsList         []M3u8TsLink // ts
 	EncryptMethod  string       // 加密方法
 	EncryptKeyUrl  string       // 加密key的url
-	EncryptKey     string       // 加密key
-	EncryptIv      string       // 加密iv
+	EncryptKey     []byte       // 加密key
+	EncryptIv      []byte       // 加密iv
 	OriginData     string       // 源数据
 	TargetDuration int
 	MediaSequence  int
@@ -44,7 +45,7 @@ func ParseM3u8(content string) *M3u8MetaData {
 		IsTsList:      true,
 		EncryptMethod: "NONE",
 		EncryptKeyUrl: "",
-		EncryptIv:     "",
+		EncryptIv:     make([]byte, 0),
 	}
 	privExtInf := ""
 	for _, line := range baseList {
@@ -86,7 +87,7 @@ func ParseM3u8(content string) *M3u8MetaData {
 					meta.EncryptKeyUrl = uri
 				}
 				if iv, ok := encrypt["IV"]; ok {
-					meta.EncryptIv = iv
+					meta.EncryptIv = []byte(iv)
 				}
 			case "EXTINF":
 				privExtInf = line
@@ -110,9 +111,9 @@ func (d M3u8MetaData) WriteHeader(out *bytes.Buffer, keystore string) {
 	out.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", d.MediaSequence))
 	out.WriteString(fmt.Sprintln("#EXT-X-INDEPENDENT-SEGMENTS"))
 	if d.EncryptMethod != "NONE" {
-		encrypt := fmt.Sprintf("METHOD=%s,URI=%s", d.EncryptMethod, keystore)
-		if d.EncryptIv != "" {
-			encrypt += ",IV=" + d.EncryptIv
+		encrypt := fmt.Sprintf("METHOD=%s,URI=%s", string(d.EncryptMethod), keystore)
+		if len(d.EncryptIv) != 0 {
+			encrypt += ",IV=" + string(d.EncryptIv)
 		}
 		out.WriteString(fmt.Sprintf("#EXT-X-KEY:%s\n", encrypt))
 	}
@@ -153,11 +154,11 @@ func (d *M3u8Downloader) Download(urlstr, dist string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		metadata.EncryptKey = key
+		metadata.EncryptKey = []byte(key)
 	}
-	//d.doDownload(metadata, urlstr, tsdir)
-	err = d.createIndexFile(metadata, dist, tsdir)
-	//err = d.combinTs(metadata, dist, tsdir)
+	d.doDownload(metadata, urlstr, tsdir)
+	//err = d.createIndexFile(metadata, dist, tsdir)
+	err = d.combinTs(metadata, dist, tsdir)
 	if err != nil {
 		return "", err
 	}
@@ -196,9 +197,18 @@ func (d *M3u8Downloader) combinTs(meta *M3u8MetaData, dist, tsdir string) error 
 		if e != nil {
 			panic(e)
 		}
-		_, err := io.Copy(distFile, tsFile)
-		if err != nil {
-			panic(err)
+		if meta.EncryptMethod == "NONE" {
+			_, err := io.Copy(distFile, tsFile)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			content, err := ioutil.ReadAll(tsFile)
+			if err != nil {
+				return err
+			}
+			decrypt, err := crypto.AES128Decrypt(content, meta.EncryptKey, meta.EncryptIv)
+			distFile.Write(decrypt)
 		}
 		tsFile.Close()
 		os.Remove(tsPath)
