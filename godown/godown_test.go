@@ -30,10 +30,14 @@ func TestDownloadCollect(t *testing.T) {
 }
 
 func TestTwitterCollect(t *testing.T) {
-	collect, err := TwitterCollect("mengmiaoyizhi", "", 10)
+	collect, err := TwitterCollect("UniG19", "", 20)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("collect size:", collect.Size())
 	fmt.Println(collect.Source)
+	ctx := Godown{
+		DataPath: path.Join("I:", "godown"),
+	}
+	ctx.DownloadCollect(collect)
 }

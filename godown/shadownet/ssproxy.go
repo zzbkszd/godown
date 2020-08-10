@@ -42,9 +42,9 @@ type ShadowConfig struct {
 }
 
 var LocalShadowConfig *ShadowConfig = &ShadowConfig{
-	Ip:           "149.28.25.5",
-	Port:         6668,
-	Password:     "password",
+	Ip:           "172.104.127.208",
+	Port:         8097,
+	Password:     "eIW0Dnk69454e6nSwuspv9DmS201tQ0D",
 	CryptoMethod: "aes-256-cfb",
 }
 

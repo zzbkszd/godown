@@ -39,7 +39,7 @@ func (god *Godown) DownloadCollect(collect *Collect) error {
 	//	CryptoMethod: "aes-256-cfb",
 	//})
 	//client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
-	client := shadownet.GetLocalClient()
+	client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
 	for idx, task := range collect.Source {
 		var downer downloader2.Downloader
 		name := downloader2.GetUrlFileName(task)
