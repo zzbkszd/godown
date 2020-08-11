@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/tidwall/gjson"
-	downloader2 "github.com/zzbkszd/godown/downloader"
+	"github.com/zzbkszd/godown/downloader"
 	"github.com/zzbkszd/godown/godown/shadownet"
 	"io/ioutil"
 	"net/http"
@@ -24,7 +24,7 @@ type DownloadTask struct {
 	Dist       string
 	Source     string
 	Type       int
-	Downloader downloader2.Downloader
+	Downloader downloader.Downloader
 }
 
 type Collect struct {

@@ -93,7 +93,7 @@ func (td *twitterApi) callTwitterApi(path, videoId string, query map[string]stri
 	headers := http.Header{}
 	headers.Add("Authorization", "Bearer AAAAAAAAAAAAAAAAAAAAAPYXBAAAAAAACLXUNDekMxqa8h%2F40K4moUkGsoc%3DTYfbDKbT3jJPCEVnMYqilB28NHfOPqkca3qaAxGfsyKCs0wRbw")
 	getToken := func() (string, error) {
-		guestReq, err := http.NewRequest(http.MethodGet, API_BASE+"1.1/guest/activate.json", nil)
+		guestReq, err := http.NewRequest(http.MethodPost, API_BASE+"1.1/guest/activate.json", nil)
 		if err != nil {
 			return "", err
 		}

@@ -56,7 +56,9 @@ func TestPornhub(t *testing.T) {
 
 func TestTwitterDownloader(t *testing.T) {
 	td := TwitterDonwloader{}
-	td.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	td.SetClient(shadownet.GetShadowClient(shadownet.LocalShadowConfig))
+	td.ProgressChan()
+	td.GetProgress()
 	//https://twitter.com/EfWMSxfSCrHY8v4/status/1242779629296840704 video
 	// https://twitter.com/isisdna123/status/1243084980516843521 picture
 	//https://twitter.com/i/web/status/1242779629296840704
