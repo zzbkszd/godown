@@ -2,6 +2,9 @@ package godown
 
 import (
 	"fmt"
+	"github.com/zzbkszd/godown/downloader"
+	"github.com/zzbkszd/godown/godown/shadownet"
+	"net/http"
 	"path"
 	"testing"
 )
@@ -30,14 +33,22 @@ func TestDownloadCollect(t *testing.T) {
 }
 
 func TestTwitterCollect(t *testing.T) {
-	collect, err := TwitterCollect("UniG19", "", 20)
+	collect, err := TwitterCollect("DensTinon", "", 20)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("collect size:", collect.Size())
 	fmt.Println(collect.Source)
-	ctx := Godown{
-		DataPath: path.Join("I:", "godown"),
-	}
-	ctx.DownloadCollect(collect)
+	//ctx := Godown{
+	//	DataPath: path.Join("I:", "godown"),
+	//}
+	//ctx.DownloadCollect(collect)
+}
+
+func TestDownProxy(t *testing.T) {
+	client := shadownet.GetShadowClient(shadownet.LocalShadowConfig)
+	h := downloader.HttpDownloader{}
+	h.SetClient(client)
+	urlStr := "https://the.earth.li/~sgtatham/putty/latest/w64/putty.zip"
+	h.HttpDown(downloader.QuickRequest(http.MethodGet, urlStr, nil), "./putty.html")
 }

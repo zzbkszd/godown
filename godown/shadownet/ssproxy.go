@@ -42,9 +42,9 @@ type ShadowConfig struct {
 }
 
 var LocalShadowConfig *ShadowConfig = &ShadowConfig{
-	Ip:           "172.104.127.208",
-	Port:         8097,
-	Password:     "eIW0Dnk69454e6nSwuspv9DmS201tQ0D",
+	Ip:           "140.238.53.31",
+	Port:         443,
+	Password:     "password",
 	CryptoMethod: "aes-256-cfb",
 }
 
@@ -55,6 +55,21 @@ func GetLocalClient() *http.Client {
 	}
 	st := &http.Transport{
 		Proxy: http.ProxyURL(proxyAddr),
+	}
+	client := http.Client{Transport: st}
+	return &client
+}
+
+func GetDefaultShadow() *http.Client {
+	st := &http.Transport{
+		Proxy:                 nil,
+		DialContext:           LocalShadowConfig.shadowDialer,
+		ForceAttemptHTTP2:     false,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 	}
 	client := http.Client{Transport: st}
 	return &client

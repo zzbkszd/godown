@@ -6,7 +6,7 @@ import (
 )
 
 type ScannerCore interface {
-	scan() (*ScannerResult, error)
+	Scan() (*ScannerResult, error)
 }
 
 type BaseScanner struct {
@@ -16,6 +16,7 @@ type BaseScanner struct {
 type DataSource struct {
 	Uri        string
 	HttpHeader http.Header
+	ExtendData interface{}
 }
 
 type ScannerResult struct {

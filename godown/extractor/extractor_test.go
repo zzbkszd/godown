@@ -5,7 +5,6 @@ import (
 	common2 "github.com/zzbkszd/godown/common"
 	"github.com/zzbkszd/godown/downloader"
 	"github.com/zzbkszd/godown/godown/shadownet"
-	"net/http"
 	"path"
 	"regexp"
 	"testing"
@@ -26,6 +25,11 @@ func TestRegexp(t *testing.T) {
 
 func TestVideoDownlaod(t *testing.T) {
 	vd := VideoDonwloader{}
+	vd.SetClient(shadownet.GetDefaultShadow())
+	vd.CommonProgress = common2.CommonProgress{
+		DisplayOnUpdate: true,
+		DisplayProgress: false,
+	}
 	// 这个……下载速度……贼尼玛不科学！
 	vd.Download("https://cn.pornhub.com/view_video.php?viewkey=ph5db26265db653",
 		"I:\\godown\\dist.mp4")
@@ -34,7 +38,7 @@ func TestVideoDownlaod(t *testing.T) {
 func testExtractor(url string, extractor func(string, *downloader.AbstractDownloader) (*VideoInfo, error)) {
 	vd := VideoDonwloader{}
 	//vd.Client = shadownet.GetShadowClient(shadownet.LocalShadowConfig)
-	vd.Client = http.DefaultClient
+	vd.Client = shadownet.GetDefaultShadow()
 	exts, err := extractor(url, &vd.AbstractDownloader)
 	if err != nil {
 		panic(err)

@@ -87,7 +87,7 @@ func TwitterCollect(user, last string, limit int) (*Collect, error) {
 	headers := http.Header{}
 	headers.Add("Accept", "application/json, text/javascript, */*; q=0.01")
 	headers.Add("Referer", fmt.Sprintf("https://twitter.com/%s", user))
-	headers.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8")
+	headers.Add("User-Agent", "Opera/9.80 (X11; Linux i686; Ubuntu/14.10) Presto/2.12.388 Version/12.16")
 	headers.Add("X-Twitter-Active-User", "yes")
 	headers.Add("X-Requested-With", "XMLHttpRequest")
 	headers.Add("Accept-Language", "en-US")
